@@ -175,6 +175,11 @@
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+            transition: transform 0.3s;
+        }
+        
+        .ad-card:hover .ad-image img {
+            transform: scale(1.05);
         }
         
         .english-badge {
@@ -285,6 +290,14 @@
             background: #f1f1f1;
             color: #1a73e8;
             padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .pagination button:hover {
+            background: #1a73e8;
+            color: white;
         }
         
         .pagination button.active {
@@ -420,7 +433,7 @@
                     id: 1,
                     title: "Summer Special Offer",
                     description: "Enjoy our exclusive discounts for the season. Limited time only!",
-                    imageUrl: "https://via.placeholder.com/300x200/4285F4/FFFFFF?text=Summer+Sale",
+                    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=200&fit=crop",
                     date: "2023-07-15",
                     regions: ["United States", "United Kingdom"],
                     format: "image",
@@ -431,7 +444,7 @@
                     id: 2,
                     title: "New Product Launch",
                     description: "Discover our latest innovation in technology and design",
-                    imageUrl: "https://via.placeholder.com/300x200/34A853/FFFFFF?text=New+Product",
+                    imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&h=200&fit=crop",
                     date: "2023-08-02",
                     regions: ["United States", "Canada"],
                     format: "image",
@@ -442,7 +455,7 @@
                     id: 3,
                     title: "Oferta Relâmpago",
                     description: "Descontos incríveis por tempo limitado, não perca!",
-                    imageUrl: "https://via.placeholder.com/300x200/EA4335/FFFFFF?text=Oferta+Relâmpago",
+                    imageUrl: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300&h=200&fit=crop",
                     date: "2023-09-10",
                     regions: ["Brasil", "Argentina"],
                     format: "image",
@@ -453,7 +466,7 @@
                     id: 4,
                     title: "Christmas Campaign",
                     description: "Perfect gifts for the whole family at great prices",
-                    imageUrl: "https://via.placeholder.com/300x200/FBBC04/FFFFFF?text=Christmas+Deals",
+                    imageUrl: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=300&h=200&fit=crop",
                     date: "2023-11-20",
                     regions: ["United States", "United Kingdom", "Canada"],
                     format: "image",
@@ -461,6 +474,10 @@
                     englishConfidence: 97
                 }
             ];
+            
+            // Variáveis de estado
+            let currentPage = 1;
+            let currentAds = [];
             
             // Função para mostrar notificação
             function showNotification(message, isError = false) {
@@ -516,60 +533,15 @@
                         filteredAds = filteredAds.filter(ad => ad.format === filters.format);
                     }
                     
-                    displayAds(filteredAds);
-                }, 2000);
-            }
-            
-            // Função para buscar anúncios (com backend real)
-            async function searchForAdsReal(advertiserId, filters) {
-                resultsContainer.innerHTML = `
-                    <div class="loading">
-                        <p>Buscando criativos para ${advertiserId}...</p>
-                    </div>
-                `;
-                
-                try {
-                    // URL do backend - substitua pela sua URL do Render
-                    const backendUrl = `/api/ads/${advertiserId}`;
-                    
-                    // Parâmetros de consulta
-                    const params = new URLSearchParams();
-                    if (filters.date) params.append('date', filters.date);
-                    if (filters.format !== 'all') params.append('format', filters.format);
-                    if (filters.region !== 'all') params.append('region', filters.region);
-                    if (filters.language !== 'all') params.append('language', filters.language);
-                    
-                    // Fazer requisição para o backend
-                    const response = await fetch(`${backendUrl}?${params}`);
-                    
-                    if (!response.ok) {
-                        throw new Error(`Erro no backend: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    displayAds(data.ads);
-                    
-                } catch (error) {
-                    console.error("Erro ao buscar anúncios:", error);
-                    showNotification("Erro ao conectar com o backend. Usando dados de simulação.", true);
-                    
-                    // Fallback para simulação em caso de erro
-                    setTimeout(() => {
-                        let filteredAds = sampleAds;
-                        
-                        if (filters.language !== 'all') {
-                            filteredAds = filteredAds.filter(ad => 
-                                filters.language === 'en' ? ad.hasEnglishText : !ad.hasEnglishText
-                            );
-                        }
-                        
-                        displayAds(filteredAds);
-                    }, 1000);
-                }
+                    currentAds = filteredAds;
+                    currentPage = 1;
+                    displayAds(currentAds, currentPage);
+                    updatePagination(currentAds.length);
+                }, 1500);
             }
             
             // Função para exibir anúncios
-            function displayAds(ads) {
+            function displayAds(ads, page = 1) {
                 if (ads.length === 0) {
                     resultsContainer.innerHTML = `
                         <div class="loading">
@@ -579,15 +551,21 @@
                     return;
                 }
                 
+                // Paginação - 6 itens por página
+                const itemsPerPage = 6;
+                const startIndex = (page - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedAds = ads.slice(startIndex, endIndex);
+                
                 resultsContainer.innerHTML = '';
                 
-                ads.forEach((ad) => {
+                paginatedAds.forEach((ad) => {
                     const adCard = document.createElement('div');
                     adCard.className = 'ad-card';
                     
                     adCard.innerHTML = `
                         <div class="ad-image">
-                            <img src="${ad.imageUrl}" alt="${ad.title}">
+                            <img src="${ad.imageUrl}" alt="${ad.title}" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=300&h=200&fit=crop'">
                             ${ad.hasEnglishText ? `<div class="english-badge">Inglês (${ad.englishConfidence}%)</div>` : ''}
                         </div>
                         <div class="ad-info">
@@ -614,41 +592,83 @@
                 });
             }
             
-            // Função para simular download
-            function downloadAd(ad) {
-                showNotification(`Download do criativo "${ad.title}" iniciado!`);
+            // Função para atualizar paginação
+            function updatePagination(totalItems) {
+                const itemsPerPage = 6;
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
                 
-                // Em uma implementação real, aqui seria o código para baixar a imagem
-                console.log(`Downloading: ${ad.imageUrl}`);
+                const paginationContainer = document.querySelector('.pagination');
+                paginationContainer.innerHTML = '';
                 
-                // Simular tempo de download
-                setTimeout(() => {
-                    showNotification(`Criativo "${ad.title}" baixado com sucesso!`);
-                    
-                    // Em uma implementação real, usaríamos algo como:
-                    const a = document.createElement('a');
-                    a.href = ad.imageUrl;
-                    a.download = `ad-${ad.id}.jpg`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }, 1500);
+                // Botão anterior
+                const prevBtn = document.createElement('button');
+                prevBtn.id = 'prevPage';
+                prevBtn.innerHTML = '&laquo; Anterior';
+                prevBtn.disabled = currentPage === 1;
+                prevBtn.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        displayAds(currentAds, currentPage);
+                        updatePagination(currentAds.length);
+                    }
+                });
+                paginationContainer.appendChild(prevBtn);
+                
+                // Botões de página
+                for (let i = 1; i <= totalPages; i++) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.textContent = i;
+                    pageBtn.className = i === currentPage ? 'active' : '';
+                    pageBtn.addEventListener('click', () => {
+                        currentPage = i;
+                        displayAds(currentAds, currentPage);
+                        updatePagination(currentAds.length);
+                    });
+                    paginationContainer.appendChild(pageBtn);
+                }
+                
+                // Botão próximo
+                const nextBtn = document.createElement('button');
+                nextBtn.id = 'nextPage';
+                nextBtn.innerHTML = 'Próxima &raquo;';
+                nextBtn.disabled = currentPage === totalPages;
+                nextBtn.addEventListener('click', () => {
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        displayAds(currentAds, currentPage);
+                        updatePagination(currentAds.length);
+                    }
+                });
+                paginationContainer.appendChild(nextBtn);
             }
             
-            // Alternar entre modo simulação e backend real
-            backendStatus.addEventListener('click', function() {
-                if (backendStatus.textContent.includes('Simulação')) {
-                    backendStatus.textContent = "Modo backend ativo";
-                    backendStatus.style.color = "#34a853";
-                    backendStatus.style.fontWeight = "bold";
-                    showNotification("Modo backend ativado");
-                } else {
-                    backendStatus.textContent = "Simulação (clique para conectar com backend real)";
-                    backendStatus.style.color = "";
-                    backendStatus.style.fontWeight = "";
-                    showNotification("Modo simulação ativado");
-                }
-            });
+            // Função para fazer download
+            function downloadAd(ad) {
+                showNotification(`Preparando download: ${ad.title}`);
+                
+                // Solução melhorada para download
+                fetch(ad.imageUrl)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `ad-${ad.id}-${ad.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.jpg`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        showNotification(`Download completo: ${ad.title}`);
+                    })
+                    .catch(error => {
+                        console.error('Erro no download:', error);
+                        // Fallback: abrir em nova aba
+                        window.open(ad.imageUrl, '_blank');
+                        showNotification(`Imagem aberta em nova aba. Use "Salvar como..."`);
+                    });
+            }
             
             // Event listener para o botão de busca
             searchBtn.addEventListener('click', function() {
@@ -665,11 +685,7 @@
                     return;
                 }
                 
-                if (backendStatus.textContent.includes('Simulação')) {
-                    searchForAds(advertiserId, filters);
-                } else {
-                    searchForAdsReal(advertiserId, filters);
-                }
+                searchForAds(advertiserId, filters);
             });
             
             // Permitir busca com Enter
@@ -677,15 +693,6 @@
                 if (e.key === 'Enter') {
                     searchBtn.click();
                 }
-            });
-            
-            // Paginação
-            prevPageBtn.addEventListener('click', function() {
-                showNotification('Carregando página anterior...');
-            });
-            
-            nextPageBtn.addEventListener('click', function() {
-                showNotification('Carregando próxima página...');
             });
             
             // Inicializar com o ID fornecido
