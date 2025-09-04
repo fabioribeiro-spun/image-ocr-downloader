@@ -1,10 +1,10 @@
-// ===== Imports (topo) =====
+// ===== Imports =====
 import express from "express";
 import axios from "axios";
 import cors from "cors";
 import morgan from "morgan";
 import * as cheerio from "cheerio";
-import puppeteer from "puppeteer"; // <<-- agora no topo
+import puppeteer from "puppeteer"; // usado na rota do Google Ads Transparency
 
 // ===== App =====
 const app = express();
@@ -13,14 +13,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(morgan("tiny"));
 app.use(express.static("public"));
-// app.use(express.json({ limit: "2mb" })); // só precisa se você receber body JSON em outras rotas
 
 // ===== Helpers =====
 const resolveUrl = (src, base) => {
   try { return new URL(src, base).href; } catch { return null; }
 };
 
-// ===== Rotas existentes =====
+// ===== Rota: buscar imagens de uma página =====
 app.get("/api/fetch-images", async (req, res) => {
   const { url, limit = 60 } = req.query;
   if (!url) return res.status(400).json({ error: "Parâmetro 'url' é obrigatório." });
@@ -64,6 +63,7 @@ app.get("/api/fetch-images", async (req, res) => {
   }
 });
 
+// ===== Rota: proxy de imagem =====
 app.get("/api/proxy-image", async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).send("url obrigatória");
@@ -77,68 +77,90 @@ app.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-// ===== NOVO: baixar criativos do Google Ads Transparency em ZIP =====
-// Exemplo: /api/google-ads-zip?advertiser=AR09499274345038479361&region=anywhere&max=80
+// ===== Rota: baixar criativos do Google Ads Transparency em ZIP =====
+// Exemplo: /api/google-ads-zip?advertiser=AR15466515195282587649&region=anywhere&max=60
 app.get("/api/google-ads-zip", async (req, res) => {
   const { advertiser, region = "anywhere", max = 80 } = req.query;
-  if (!advertiser) return res.status(400).send("Parâmetro 'advertiser' é obrigatório.");
+  if (!advertiser) return res.status(400).json({ error: "Parâmetro 'advertiser' é obrigatório." });
 
   const url = `https://adstransparency.google.com/advertiser/${encodeURIComponent(advertiser)}?region=${encodeURIComponent(region)}`;
 
+  // evita timeout
+  req.setTimeout(0);
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="google-ads-${advertiser}.zip"`);
 
-  // import dinâmico do archiver pra evitar carregar à toa
   const archiver = (await import("archiver")).default;
   const archive = archiver("zip", { zlib: { level: 9 } });
-  archive.on("error", err => { console.error(err); try { res.status(500).end(); } catch {} });
+  archive.on("error", (err) => { console.error("ARCHIVER:", err); try { res.status(500).end(); } catch {} });
   archive.pipe(res);
 
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-  });
-  const page = await browser.newPage();
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-zygote",
+        "--single-process",
+        "--ignore-certificate-errors",
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    });
 
-  // captura de imagens via respostas de rede
-  const images = new Map(); // url -> Buffer
-  page.on("response", async (resp) => {
-    try {
-      const ct = resp.headers()["content-type"] || "";
-      if (!ct.startsWith("image/")) return;
-      const buf = await resp.buffer();
-      if (!buf || buf.length < 2000) return; // ignora ícones/sprites muito pequenos
-      const u = resp.url();
-      if (!images.has(u)) images.set(u, buf);
-    } catch {
-      // ignore
+    const page = await browser.newPage();
+
+    // captura de imagens via rede
+    const images = new Map();
+    page.on("response", async (resp) => {
+      try {
+        const ct = resp.headers()["content-type"] || "";
+        if (!ct.startsWith("image/")) return;
+        const buf = await resp.buffer();
+        if (!buf || buf.length < 2000) return; // ignora ícones/sprites pequenos
+        const u = resp.url();
+        if (!images.has(u)) images.set(u, buf);
+      } catch (e) {
+        console.warn("response handler:", e?.message);
+      }
+    });
+
+    await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36");
+
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 90000 });
+
+    // rolagem para carregar mais
+    let lastSize = 0, tries = 0;
+    const limit = Number(max) || 80;
+    while (images.size < limit && tries < 16) {
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 1.25));
+      await page.waitForTimeout(1600);
+      if (images.size === lastSize) tries++; else { lastSize = images.size; tries = 0; }
     }
-  });
 
-  // abre a página e rola para carregar mais anúncios
-  await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36");
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    // salva no ZIP
+    let i = 1;
+    for (const [u, buf] of images.entries()) {
+      let ext = ".jpg";
+      if (u.includes(".png")) ext = ".png";
+      else if (u.includes(".webp")) ext = ".webp";
+      else if (u.includes(".gif")) ext = ".gif";
+      const name = `ad-${String(i).padStart(3, "0")}${ext}`;
+      archive.append(buf, { name });
+      if (++i > limit) break;
+    }
 
-  let lastSize = 0, tries = 0;
-  while (images.size < Number(max) && tries < 12) {
-    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 1.2));
-    await page.waitForTimeout(1500);
-    if (images.size === lastSize) tries++; else { lastSize = images.size; tries = 0; }
+    await browser.close();
+    archive.finalize();
+  } catch (err) {
+    console.error("PUPPETEER ROUTE ERROR:", err?.message, err);
+    try { if (browser) await browser.close(); } catch {}
+    archive.append(Buffer.from(`Erro ao coletar: ${err?.message || err}`), { name: "ERROR.txt" });
+    archive.finalize();
   }
-
-  // grava no ZIP
-  let i = 1;
-  for (const [u, buf] of images.entries()) {
-    let ext = ".jpg";
-    if (u.includes(".png")) ext = ".png";
-    else if (u.includes(".webp")) ext = ".webp";
-    else if (u.includes(".gif")) ext = ".gif";
-    const name = `ad-${String(i).padStart(3, "0")}${ext}`;
-    archive.append(buf, { name });
-    if (++i > Number(max)) break;
-  }
-
-  await browser.close();
-  archive.finalize();
 });
 
 // ===== Start =====
