@@ -1,7 +1,7 @@
 {
   "name": "google-ads-scraper",
   "version": "1.0.0",
-  "description": "Ferramenta para buscar criativos com texto em inglês do Google Ads Transparency",
+  "description": "Ferramenta profissional para análise de criativos do Google Ads",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,20 +9,18 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "puppeteer": "^21.0.0"
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
   "keywords": [
     "google-ads",
-    "scraper",
-    "ocr",
-    "english-text",
-    "ad-transparency"
+    "transparency",
+    "ad-analysis",
+    "marketing-tools"
   ],
-  "author": "Seu Nome",
+  "author": "Expert Analytics Team",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
