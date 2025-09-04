@@ -72,17 +72,40 @@ function getSampleAds() {
             format: "image",
             hasEnglishText: true,
             englishConfidence: 92
+        },
+        {
+            id: 3,
+            title: "Oferta Relâmpago",
+            description: "Descontos incríveis por tempo limitado, não perca!",
+            imageUrl: "https://via.placeholder.com/300x200/EA4335/FFFFFF?text=Oferta+Relâmpago",
+            date: "2023-09-10",
+            regions: ["Brasil", "Argentina"],
+            format: "image",
+            hasEnglishText: false,
+            englishConfidence: 5
+        },
+        {
+            id: 4,
+            title: "Christmas Campaign",
+            description: "Perfect gifts for the whole family at great prices",
+            imageUrl: "https://via.placeholder.com/300x200/FBBC04/FFFFFF?text=Christmas+Deals",
+            date: "2023-11-20",
+            regions: ["United States", "United Kingdom", "Canada"],
+            format: "image",
+            hasEnglishText: true,
+            englishConfidence: 97
         }
     ];
 }
 
-// Simular OCR
+// Simular OCR (Tesseract removido para deploy inicial)
 function processAdsWithOCR(ads) {
     console.log("Simulando processamento OCR...");
     return ads.map(ad => {
         // Simular detecção de inglês
-        ad.hasEnglishText = ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/);
-        ad.englishConfidence = ad.hasEnglishText ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 20);
+        const hasEnglish = ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/);
+        ad.hasEnglishText = hasEnglish;
+        ad.englishConfidence = hasEnglish ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 20);
         return ad;
     });
 }
@@ -91,4 +114,5 @@ function processAdsWithOCR(ads) {
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Health check disponível em: http://localhost:${PORT}/api/health`);
 });
