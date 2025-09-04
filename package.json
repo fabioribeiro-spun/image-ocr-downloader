@@ -1,21 +1,28 @@
 {
-  "name": "image-ocr-downloader",
+  "name": "google-ads-scraper",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Ferramenta para buscar criativos com texto em inglês do Google Ads Transparency",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "puppeteer browsers install chromium"
-  },
-  "engines": {
-    "node": "20.x"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "archiver": "^5.3.2",
-    "axios": "^1.7.2",
-    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "morgan": "^1.10.0",
-    "puppeteer": "21.9.0"
-  }
+    "puppeteer": "^21.0.0",
+    "tesseract.js": "^4.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "google-ads",
+    "scraper",
+    "ocr",
+    "english-text",
+    "ad-transparency"
+  ],
+  "author": "Seu Nome",
+  "license": "MIT"
 }
