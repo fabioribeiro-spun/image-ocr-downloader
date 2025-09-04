@@ -20,7 +20,6 @@
     .ctrl{display:flex;flex-direction:column}
     button{background:#2575fc;color:#fff;border:none;padding:12px 18px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;transition:background .3s,transform .2s;height:44px}
     button:hover{background:#6a11cb;transform:translateY(-1px)}
-    .options{display:flex;gap:16px;align-items:center;margin:8px 0 0}
     .results{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:18px}
     .image-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 5px 15px rgba(0,0,0,.1);transition:transform .3s}
     .image-card:hover{transform:translateY(-4px)}
@@ -41,8 +40,6 @@
     .bar{height:100%;width:0;background:linear-gradient(90deg,#6a11cb,#2575fc)}
     footer{margin-top:30px;text-align:center;color:#fff;font-size:14px}
     small.note{color:#5b6b82;font-size:12px}
-    @media (max-width:900px){.row{grid-template-columns:repeat(2,minmax(120px,1fr))}}
-    @media (max-width:600px){.input-section{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -57,7 +54,7 @@
         <label for="siteUrl">URL do site (ex.: https://exemplo.com)</label>
         <input type="url" id="siteUrl" placeholder="https://exemplo.com" value="">
       </div>
-      <button id="searchBtn" aria-label="Buscar imagens">Buscar Imagens</button>
+      <button id="searchBtn">Buscar Imagens</button>
     </div>
 
     <div class="row">
@@ -85,24 +82,30 @@
     <div id="resultsContainer" class="results"></div>
   </div>
 
-  <div id="notification" class="notification" role="alert" aria-live="polite">Pronto!</div>
+  <div id="notification" class="notification">Pronto!</div>
   <footer><p>&copy; 2025</p></footer>
 
   <script>
     const $ = s => document.querySelector(s);
     const $$ = s => Array.from(document.querySelectorAll(s));
-    const toast = (msg, ok=true) => {
+
+    function toast(msg, ok=true) {
       const el = document.querySelector('#notification');
       el.textContent = msg;
       el.style.background = ok ? '#4CAF50' : '#E53935';
       el.classList.add('show');
       setTimeout(() => el.classList.remove('show'), 2600);
-    };
-    const setProgress = (pct, txt='') => {
-      const bar = $('#progressBar'); const wrap = $('#progressWrap'); const lab = $('#progressText');
-      wrap.style.display = 'block'; bar.style.width = pct + '%'; lab.textContent = txt;
+    }
+
+    function setProgress(pct, txt='') {
+      const bar = $('#progressBar'); 
+      const wrap = $('#progressWrap'); 
+      const lab = $('#progressText');
+      wrap.style.display = 'block'; 
+      bar.style.width = pct + '%'; 
+      lab.textContent = txt;
       if (pct >= 100) setTimeout(()=> wrap.style.display='none', 600);
-    };
+    }
 
     async function fetchImagesFromServer(url, limit){
       const resp = await fetch(`/api/fetch-images?url=${encodeURIComponent(url)}&limit=${Number(limit)||40}`);
@@ -113,7 +116,10 @@
     function renderCards(items){
       const cont = $('#resultsContainer');
       cont.innerHTML = '';
-      if(!items.length){ $('#status').innerHTML = '<div class="loading">Nenhuma imagem encontrada.</div>'; return; }
+      if(!items.length){
+        $('#status').innerHTML = '<div class="loading">Nenhuma imagem encontrada.</div>'; 
+        return;
+      }
       $('#status').innerHTML = '';
       items.forEach((u,i)=>{
         const card = document.createElement('div');
@@ -123,10 +129,10 @@
           <div class="image-info">
             <h3>Imagem ${i+1}</h3>
             <p>Pré-visualização via proxy (CORS-free).</p>
-            <div class="meta">Fonte: ${'${'}new URL(u).hostname}</div>
+            <div class="meta">Fonte: ${new URL(u).hostname}</div>
             <div class="actions">
-              <div class="btn" data-url="${'${'}u}" data-name="img-${'${'}i}.jpg">Download</div>
-              <div class="btn" data-open="${'${'}u}">Abrir origem</div>
+              <div class="btn" data-url="${u}" data-name="img-${i}.jpg">Download</div>
+              <div class="btn" data-open="${u}">Abrir origem</div>
             </div>
           </div>`;
         cont.appendChild(card);
@@ -158,8 +164,10 @@
 
     async function ocrImgElement(imgEl, lang='eng'){
       const canvas = document.createElement('canvas');
-      canvas.width = imgEl.naturalWidth; canvas.height = imgEl.naturalHeight;
-      const ctx = canvas.getContext('2d'); ctx.drawImage(imgEl,0,0);
+      canvas.width = imgEl.naturalWidth; 
+      canvas.height = imgEl.naturalHeight;
+      const ctx = canvas.getContext('2d'); 
+      ctx.drawImage(imgEl,0,0);
       const r = await Tesseract.recognize(canvas, lang);
       const words = r.data.words || [];
       const conf = words.length ? (words.reduce((s,w)=> s + (w.confidence||0), 0) / words.length) : (r.data.confidence || 0);
@@ -176,7 +184,7 @@
           const { text, confidence } = await ocrImgElement(img, lang);
           const maybeEnglish = /[A-Za-z]/.test(text) && !/[À-ÖØ-öø-ÿ]/.test(text);
           const meta = cards[i].querySelector('.meta');
-          meta.textContent += ` | OCR: ${'${'}Math.round(confidence)}%`;
+          meta.textContent += ` | OCR: ${Math.round(confidence)}%`;
           if (!(maybeEnglish && confidence >= minConfidence)) {
             cards[i].style.opacity = .35;
           } else {
@@ -187,7 +195,7 @@
         }catch {}
       }
       setProgress(100, 'Concluído');
-      toast(`${'${'}passed} imagem(ns) com texto em inglês acima de ${'${'}minConfidence}%`);
+      toast(`${passed} imagem(ns) com texto em inglês acima de ${minConfidence}%`);
     }
 
     document.querySelector('#searchBtn').addEventListener('click', async ()=>{
@@ -196,7 +204,7 @@
       const minConf = Number(document.querySelector('#minConfidence').value) || 60;
       const lang = (document.querySelector('#lang')?.value || 'eng').trim();
 
-      if(!/^https?:\/\//.test(url)){ toast('Digite uma URL começando com http(s)://', false); return; }
+      if(!/^https?:\/\//.test(url)){ toast('Digite uma URL válida começando com http(s)://', false); return; }
 
       $('#resultsContainer').innerHTML = '';
       $('#status').innerHTML = '<div class="loading">Buscando imagens…</div>';
