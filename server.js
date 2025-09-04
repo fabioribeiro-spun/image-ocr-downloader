@@ -1,160 +1,143 @@
-// ===== Imports =====
-import express from "express";
-import axios from "axios";
-import cors from "cors";
-import morgan from "morgan";
-import * as cheerio from "cheerio";
-import puppeteer from "puppeteer"; // usado na rota do Google Ads Transparency
+const express = require('express');
+const cors = require('cors');
+const puppeteer = require('puppeteer');
+const Tesseract = require('tesseract.js');
+const path = require('path');
 
-// ===== App =====
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
-app.use(morgan("tiny"));
-app.use(express.static("public"));
+app.use(express.json());
+app.use(express.static('public'));
 
-// ===== Helpers =====
-const resolveUrl = (src, base) => {
-  try { return new URL(src, base).href; } catch { return null; }
-};
-
-// ===== Rota: buscar imagens de uma página =====
-app.get("/api/fetch-images", async (req, res) => {
-  const { url, limit = 60 } = req.query;
-  if (!url) return res.status(400).json({ error: "Parâmetro 'url' é obrigatório." });
-
-  try {
-    const htmlResp = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8"
-      },
-      timeout: 15000,
-      maxRedirects: 5,
-      validateStatus: s => s >= 200 && s < 400
-    });
-
-    const base = new URL(url).origin;
-    const $ = cheerio.load(htmlResp.data);
-    const urls = new Set();
-
-    $("img").each((_, el) => {
-      const src = $(el).attr("src") || $(el).attr("data-src") || "";
-      const out = resolveUrl(src, base);
-      if (!out) return;
-      const bad = out.startsWith("data:") || out.endsWith(".svg") || out.includes("sprite") || out.includes("icon") || out.includes("logo");
-      if (!bad) urls.add(out);
-    });
-
-    $("source").each((_, el) => {
-      const srcset = $(el).attr("srcset");
-      if (srcset) {
-        const first = srcset.split(",")[0].trim().split(" ")[0];
-        const out = resolveUrl(first, base);
-        if (out) urls.add(out);
-      }
-    });
-
-    const list = Array.from(urls).slice(0, Number(limit));
-    res.json({ ok: true, count: list.length, images: list });
-  } catch (err) {
-    res.status(500).json({ error: "Falha ao carregar página alvo.", detail: String(err.message || err) });
-  }
+// Rota principal
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ===== Rota: proxy de imagem =====
-app.get("/api/proxy-image", async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).send("url obrigatória");
-  try {
-    const upstream = await axios.get(url, { responseType: "stream", timeout: 15000 });
-    const ct = upstream.headers["content-type"] || "application/octet-stream";
-    res.setHeader("Content-Type", ct);
-    upstream.data.pipe(res);
-  } catch (err) {
-    res.status(502).send("Falha ao buscar imagem.");
-  }
-});
-
-// ===== Rota: baixar criativos do Google Ads Transparency em ZIP =====
-// Exemplo: /api/google-ads-zip?advertiser=AR15466515195282587649&region=anywhere&max=60
-// ...
-app.get("/api/google-ads-zip", async (req, res) => {
-  // ... (código igual ao que te mandei)
-  let browser;
-  try {
-    // descobre o caminho do Chromium baixado pelo Puppeteer
-    const exePath = await puppeteer.executablePath(); // <- importante
-
-    browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: exePath,                        // <- usa o binário baixado
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
-        "--ignore-certificate-errors"
-      ]
-    });
-
-    // ... (restante da rota exatamente como está)
-
-
-    const page = await browser.newPage();
-
-    // captura de imagens via rede
-    const images = new Map();
-    page.on("response", async (resp) => {
-      try {
-        const ct = resp.headers()["content-type"] || "";
-        if (!ct.startsWith("image/")) return;
-        const buf = await resp.buffer();
-        if (!buf || buf.length < 2000) return; // ignora ícones/sprites pequenos
-        const u = resp.url();
-        if (!images.has(u)) images.set(u, buf);
-      } catch (e) {
-        console.warn("response handler:", e?.message);
-      }
-    });
-
-    await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36");
-
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 90000 });
-
-    // rolagem para carregar mais
-    let lastSize = 0, tries = 0;
-    const limit = Number(max) || 80;
-    while (images.size < limit && tries < 16) {
-      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 1.25));
-      await page.waitForTimeout(1600);
-      if (images.size === lastSize) tries++; else { lastSize = images.size; tries = 0; }
+// Rota para buscar anúncios
+app.get('/api/ads/:advertiserId', async (req, res) => {
+    try {
+        const { advertiserId } = req.params;
+        const { date, format, region, language } = req.query;
+        
+        console.log(`Buscando anúncios para: ${advertiserId}`);
+        
+        // Implementar scraping do Google Ad Transparency
+        const ads = await scrapeAds(advertiserId, { date, format, region, language });
+        
+        // Processar imagens com OCR para detectar texto em inglês
+        const processedAds = await processAdsWithOCR(ads);
+        
+        res.json({ ads: processedAds });
+    } catch (error) {
+        console.error('Erro ao buscar anúncios:', error);
+        res.status(500).json({ error: error.message });
     }
-
-    // salva no ZIP
-    let i = 1;
-    for (const [u, buf] of images.entries()) {
-      let ext = ".jpg";
-      if (u.includes(".png")) ext = ".png";
-      else if (u.includes(".webp")) ext = ".webp";
-      else if (u.includes(".gif")) ext = ".gif";
-      const name = `ad-${String(i).padStart(3, "0")}${ext}`;
-      archive.append(buf, { name });
-      if (++i > limit) break;
-    }
-
-    await browser.close();
-    archive.finalize();
-  } catch (err) {
-    console.error("PUPPETEER ROUTE ERROR:", err?.message, err);
-    try { if (browser) await browser.close(); } catch {}
-    archive.append(Buffer.from(`Erro ao coletar: ${err?.message || err}`), { name: "ERROR.txt" });
-    archive.finalize();
-  }
 });
 
-// ===== Start =====
-app.listen(PORT, () => console.log(`Servidor ON em http://localhost:${PORT}`));
+// Função para fazer scraping dos anúncios
+async function scrapeAds(advertiserId, filters) {
+    // Esta é uma função simulada - em produção, implementaria o scraping real
+    console.log(`Simulando scraping para: ${advertiserId}`);
+    
+    // Dados de exemplo
+    const sampleAds = [
+        {
+            id: 1,
+            title: "Summer Special Offer",
+            description: "Enjoy our exclusive discounts for the season. Limited time only!",
+            imageUrl: "https://via.placeholder.com/300x200/4285F4/FFFFFF?text=Summer+Sale",
+            date: "2023-07-15",
+            regions: ["United States", "United Kingdom"],
+            format: "image"
+        },
+        {
+            id: 2,
+            title: "New Product Launch",
+            description: "Discover our latest innovation in technology and design",
+            imageUrl: "https://via.placeholder.com/300x200/34A853/FFFFFF?text=New+Product",
+            date: "2023-08-02",
+            regions: ["United States", "Canada"],
+            format: "image"
+        },
+        {
+            id: 3,
+            title: "Oferta Relâmpago",
+            description: "Descontos incríveis por tempo limitado, não perca!",
+            imageUrl: "https://via.placeholder.com/300x200/EA4335/FFFFFF?text=Oferta+Relâmpago",
+            date: "2023-09-10",
+            regions: ["Brasil", "Argentina"],
+            format: "image"
+        },
+        {
+            id: 4,
+            title: "Christmas Campaign",
+            description: "Perfect gifts for the whole family at great prices",
+            imageUrl: "https://via.placeholder.com/300x200/FBBC04/FFFFFF?text=Christmas+Deals",
+            date: "2023-11-20",
+            regions: ["United States", "United Kingdom", "Canada"],
+            format: "image"
+        }
+    ];
+    
+    // Aplicar filtros
+    let filteredAds = sampleAds;
+    
+    if (filters.language === 'en') {
+        // Filtrar apenas anúncios em inglês
+        filteredAds = filteredAds.filter(ad => 
+            ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/)
+        );
+    }
+    
+    if (filters.region !== 'all') {
+        filteredAds = filteredAds.filter(ad => 
+            ad.regions.some(region => 
+                filters.region === 'us' ? region.includes('United') : 
+                filters.region === 'br' ? region.includes('Brasil') :
+                true
+            )
+        );
+    }
+    
+    if (filters.format !== 'all') {
+        filteredAds = filteredAds.filter(ad => ad.format === filters.format);
+    }
+    
+    return filteredAds;
+}
+
+// Função para processar anúncios com OCR
+async function processAdsWithOCR(ads) {
+    console.log("Processando anúncios com OCR...");
+    
+    // Para cada anúncio, simular processamento de OCR
+    for (let ad of ads) {
+        try {
+            // Simular OCR - em produção, usaria Tesseract.js para analisar a imagem
+            const hasEnglish = ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/);
+            ad.hasEnglishText = hasEnglish;
+            ad.englishConfidence = hasEnglish ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 20);
+            
+            // Em produção real, faríamos:
+            // const result = await Tesseract.recognize(ad.imageUrl, 'eng');
+            // ad.hasEnglishText = result.data.text.length > 10;
+            // ad.englishConfidence = result.data.confidence;
+            
+        } catch (error) {
+            console.error(`Erro ao processar anúncio ${ad.id}:`, error);
+            ad.hasEnglishText = false;
+            ad.englishConfidence = 0;
+        }
+    }
+    
+    return ads;
+}
+
+// Iniciar servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+});
