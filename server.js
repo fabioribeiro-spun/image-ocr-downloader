@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const Tesseract = require('tesseract.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,11 +23,11 @@ app.get('/api/ads/:advertiserId', async (req, res) => {
         
         console.log(`Buscando anúncios para: ${advertiserId}`);
         
-        // Usando dados simulados (remover puppeteer por enquanto)
+        // Dados simulados
         const ads = getSampleAds();
         
-        // Processar imagens com OCR para detectar texto em inglês
-        const processedAds = await processAdsWithOCR(ads);
+        // Simular processamento OCR
+        const processedAds = processAdsWithOCR(ads);
         
         res.json({ ads: processedAds });
     } catch (error) {
@@ -49,7 +48,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Dados de exemplo para fallback
+// Dados de exemplo
 function getSampleAds() {
     return [
         {
@@ -59,7 +58,9 @@ function getSampleAds() {
             imageUrl: "https://via.placeholder.com/300x200/4285F4/FFFFFF?text=Summer+Sale",
             date: "2023-07-15",
             regions: ["United States", "United Kingdom"],
-            format: "image"
+            format: "image",
+            hasEnglishText: true,
+            englishConfidence: 95
         },
         {
             id: 2,
@@ -68,54 +69,26 @@ function getSampleAds() {
             imageUrl: "https://via.placeholder.com/300x200/34A853/FFFFFF?text=New+Product",
             date: "2023-08-02",
             regions: ["United States", "Canada"],
-            format: "image"
-        },
-        {
-            id: 3,
-            title: "Oferta Relâmpago",
-            description: "Descontos incríveis por tempo limitado, não perca!",
-            imageUrl: "https://via.placeholder.com/300x200/EA4335/FFFFFF?text=Oferta+Relâmpago",
-            date: "2023-09-10",
-            regions: ["Brasil", "Argentina"],
-            format: "image"
-        },
-        {
-            id: 4,
-            title: "Christmas Campaign",
-            description: "Perfect gifts for the whole family at great prices",
-            imageUrl: "https://via.placeholder.com/300x200/FBBC04/FFFFFF?text=Christmas+Deals",
-            date: "2023-11-20",
-            regions: ["United States", "United Kingdom", "Canada"],
-            format: "image"
+            format: "image",
+            hasEnglishText: true,
+            englishConfidence: 92
         }
     ];
 }
 
-// Função para processar anúncios com OCR
-async function processAdsWithOCR(ads) {
-    console.log("Processando anúncios com OCR...");
-    
-    // Para cada anúncio, simular processamento de OCR
-    for (let ad of ads) {
-        try {
-            // Simular OCR
-            const hasEnglish = ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/);
-            ad.hasEnglishText = hasEnglish;
-            ad.englishConfidence = hasEnglish ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 20);
-            
-        } catch (error) {
-            console.error(`Erro ao processar anúncio ${ad.id}:`, error);
-            ad.hasEnglishText = false;
-            ad.englishConfidence = 0;
-        }
-    }
-    
-    return ads;
+// Simular OCR
+function processAdsWithOCR(ads) {
+    console.log("Simulando processamento OCR...");
+    return ads.map(ad => {
+        // Simular detecção de inglês
+        ad.hasEnglishText = ad.title.match(/[a-zA-Z]/) && !ad.title.match(/[à-üÀ-Ü]/);
+        ad.englishConfidence = ad.hasEnglishText ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 20);
+        return ad;
+    });
 }
 
 // Iniciar servidor
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Health check disponível em: http://localhost:${PORT}/api/health`);
 });
