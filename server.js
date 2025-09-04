@@ -1,20 +1,26 @@
+// ===== Imports (topo) =====
 import express from "express";
 import axios from "axios";
 import cors from "cors";
 import morgan from "morgan";
 import * as cheerio from "cheerio";
+import puppeteer from "puppeteer"; // <<-- agora no topo
 
+// ===== App =====
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(morgan("tiny"));
 app.use(express.static("public"));
+// app.use(express.json({ limit: "2mb" })); // só precisa se você receber body JSON em outras rotas
 
+// ===== Helpers =====
 const resolveUrl = (src, base) => {
   try { return new URL(src, base).href; } catch { return null; }
 };
 
+// ===== Rotas existentes =====
 app.get("/api/fetch-images", async (req, res) => {
   const { url, limit = 60 } = req.query;
   if (!url) return res.status(400).json({ error: "Parâmetro 'url' é obrigatório." });
@@ -71,10 +77,8 @@ app.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Servidor ON em http://localhost:${PORT}`));
-import puppeteer from "puppeteer"; // topo do arquivo
-
-// GET /api/google-ads-zip?advertiser=AR09499274345038479361&region=anywhere&max=80
+// ===== NOVO: baixar criativos do Google Ads Transparency em ZIP =====
+// Exemplo: /api/google-ads-zip?advertiser=AR09499274345038479361&region=anywhere&max=80
 app.get("/api/google-ads-zip", async (req, res) => {
   const { advertiser, region = "anywhere", max = 80 } = req.query;
   if (!advertiser) return res.status(400).send("Parâmetro 'advertiser' é obrigatório.");
@@ -84,7 +88,9 @@ app.get("/api/google-ads-zip", async (req, res) => {
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="google-ads-${advertiser}.zip"`);
 
-  const archive = (await import("archiver")).default("zip", { zlib: { level: 9 } });
+  // import dinâmico do archiver pra evitar carregar à toa
+  const archiver = (await import("archiver")).default;
+  const archive = archiver("zip", { zlib: { level: 9 } });
   archive.on("error", err => { console.error(err); try { res.status(500).end(); } catch {} });
   archive.pipe(res);
 
@@ -93,7 +99,7 @@ app.get("/api/google-ads-zip", async (req, res) => {
   });
   const page = await browser.newPage();
 
-  // coleta de imagens via rede
+  // captura de imagens via respostas de rede
   const images = new Map(); // url -> Buffer
   page.on("response", async (resp) => {
     try {
@@ -103,14 +109,15 @@ app.get("/api/google-ads-zip", async (req, res) => {
       if (!buf || buf.length < 2000) return; // ignora ícones/sprites muito pequenos
       const u = resp.url();
       if (!images.has(u)) images.set(u, buf);
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
   });
 
-  // navega e carrega
+  // abre a página e rola para carregar mais anúncios
   await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36");
   await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-  // rola para carregar mais anúncios
   let lastSize = 0, tries = 0;
   while (images.size < Number(max) && tries < 12) {
     await page.evaluate(() => window.scrollBy(0, window.innerHeight * 1.2));
@@ -118,19 +125,21 @@ app.get("/api/google-ads-zip", async (req, res) => {
     if (images.size === lastSize) tries++; else { lastSize = images.size; tries = 0; }
   }
 
-  // joga pro ZIP
+  // grava no ZIP
   let i = 1;
   for (const [u, buf] of images.entries()) {
     let ext = ".jpg";
     if (u.includes(".png")) ext = ".png";
     else if (u.includes(".webp")) ext = ".webp";
+    else if (u.includes(".gif")) ext = ".gif";
     const name = `ad-${String(i).padStart(3, "0")}${ext}`;
     archive.append(buf, { name });
-    i++;
-    if (i > Number(max)) break;
+    if (++i > Number(max)) break;
   }
 
   await browser.close();
   archive.finalize();
 });
 
+// ===== Start =====
+app.listen(PORT, () => console.log(`Servidor ON em http://localhost:${PORT}`));
