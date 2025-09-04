@@ -72,3 +72,65 @@ app.get("/api/proxy-image", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Servidor ON em http://localhost:${PORT}`));
+import puppeteer from "puppeteer"; // topo do arquivo
+
+// GET /api/google-ads-zip?advertiser=AR09499274345038479361&region=anywhere&max=80
+app.get("/api/google-ads-zip", async (req, res) => {
+  const { advertiser, region = "anywhere", max = 80 } = req.query;
+  if (!advertiser) return res.status(400).send("Parâmetro 'advertiser' é obrigatório.");
+
+  const url = `https://adstransparency.google.com/advertiser/${encodeURIComponent(advertiser)}?region=${encodeURIComponent(region)}`;
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="google-ads-${advertiser}.zip"`);
+
+  const archive = (await import("archiver")).default("zip", { zlib: { level: 9 } });
+  archive.on("error", err => { console.error(err); try { res.status(500).end(); } catch {} });
+  archive.pipe(res);
+
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+  const page = await browser.newPage();
+
+  // coleta de imagens via rede
+  const images = new Map(); // url -> Buffer
+  page.on("response", async (resp) => {
+    try {
+      const ct = resp.headers()["content-type"] || "";
+      if (!ct.startsWith("image/")) return;
+      const buf = await resp.buffer();
+      if (!buf || buf.length < 2000) return; // ignora ícones/sprites muito pequenos
+      const u = resp.url();
+      if (!images.has(u)) images.set(u, buf);
+    } catch { /* ignore */ }
+  });
+
+  // navega e carrega
+  await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36");
+  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+
+  // rola para carregar mais anúncios
+  let lastSize = 0, tries = 0;
+  while (images.size < Number(max) && tries < 12) {
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 1.2));
+    await page.waitForTimeout(1500);
+    if (images.size === lastSize) tries++; else { lastSize = images.size; tries = 0; }
+  }
+
+  // joga pro ZIP
+  let i = 1;
+  for (const [u, buf] of images.entries()) {
+    let ext = ".jpg";
+    if (u.includes(".png")) ext = ".png";
+    else if (u.includes(".webp")) ext = ".webp";
+    const name = `ad-${String(i).padStart(3, "0")}${ext}`;
+    archive.append(buf, { name });
+    i++;
+    if (i > Number(max)) break;
+  }
+
+  await browser.close();
+  archive.finalize();
+});
+
