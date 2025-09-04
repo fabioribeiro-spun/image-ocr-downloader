@@ -79,26 +79,17 @@ app.get("/api/proxy-image", async (req, res) => {
 
 // ===== Rota: baixar criativos do Google Ads Transparency em ZIP =====
 // Exemplo: /api/google-ads-zip?advertiser=AR15466515195282587649&region=anywhere&max=60
+// ...
 app.get("/api/google-ads-zip", async (req, res) => {
-  const { advertiser, region = "anywhere", max = 80 } = req.query;
-  if (!advertiser) return res.status(400).json({ error: "Parâmetro 'advertiser' é obrigatório." });
-
-  const url = `https://adstransparency.google.com/advertiser/${encodeURIComponent(advertiser)}?region=${encodeURIComponent(region)}`;
-
-  // evita timeout
-  req.setTimeout(0);
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename="google-ads-${advertiser}.zip"`);
-
-  const archiver = (await import("archiver")).default;
-  const archive = archiver("zip", { zlib: { level: 9 } });
-  archive.on("error", (err) => { console.error("ARCHIVER:", err); try { res.status(500).end(); } catch {} });
-  archive.pipe(res);
-
+  // ... (código igual ao que te mandei)
   let browser;
   try {
+    // descobre o caminho do Chromium baixado pelo Puppeteer
+    const exePath = await puppeteer.executablePath(); // <- importante
+
     browser = await puppeteer.launch({
       headless: "new",
+      executablePath: exePath,                        // <- usa o binário baixado
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -106,10 +97,12 @@ app.get("/api/google-ads-zip", async (req, res) => {
         "--disable-gpu",
         "--no-zygote",
         "--single-process",
-        "--ignore-certificate-errors",
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        "--ignore-certificate-errors"
+      ]
     });
+
+    // ... (restante da rota exatamente como está)
+
 
     const page = await browser.newPage();
 
