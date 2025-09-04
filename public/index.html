@@ -1,230 +1,701 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ferramenta de Download de Imagens (com OCR)</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
-    body{background:linear-gradient(135deg,#6a11cb 0%,#2575fc 100%);color:#333;min-height:100vh;padding:20px;display:flex;flex-direction:column;align-items:center}
-    .container{width:100%;max-width:1200px;background:rgba(255,255,255,.95);border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:30px;margin-top:20px}
-    header{text-align:center;margin-bottom:20px}
-    h1{color:#2575fc;margin-bottom:8px;font-size:2.2rem}
-    .subtitle{color:#6a11cb;font-size:1rem;margin-bottom:10px}
-    .input-section{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:16px}
-    .row{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;margin-bottom:10px}
-    input[type="url"],input[type="number"]{padding:12px;border:2px solid #ddd;border-radius:8px;font-size:15px;transition:border-color .3s}
-    input[type="url"]:focus,input[type="number"]:focus{border-color:#2575fc;outline:none}
-    label{font-size:13px;color:#444;margin-bottom:4px}
-    .ctrl{display:flex;flex-direction:column}
-    button{background:#2575fc;color:#fff;border:none;padding:12px 18px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;transition:background .3s,transform .2s;height:44px}
-    button:hover{background:#6a11cb;transform:translateY(-1px)}
-    .results{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:18px}
-    .image-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 5px 15px rgba(0,0,0,.1);transition:transform .3s}
-    .image-card:hover{transform:translateY(-4px)}
-    .image-container{height:180px;overflow:hidden;background:#f4f6f8}
-    .image-container img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
-    .image-card:hover .image-container img{transform:scale(1.03)}
-    .image-info{padding:14px}
-    .image-info h3{margin-bottom:8px;color:#2575fc;font-size:16px}
-    .image-info p{color:#555;font-size:13px;margin-bottom:10px;line-height:1.4}
-    .meta{font-size:12px;color:#777;margin-bottom:10px}
-    .actions{display:flex;gap:8px}
-    .btn{background:#6a11cb;color:#fff;text-align:center;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;flex:1}
-    .btn:hover{background:#2575fc}
-    .loading{text-align:center;padding:28px;font-size:16px;color:#2575fc}
-    .notification{position:fixed;top:20px;right:20px;padding:14px 20px;border-radius:8px;background:#4CAF50;color:#fff;box-shadow:0 5px 15px rgba(0,0,0,.2);transform:translateX(120%);transition:transform .3s;z-index:1000}
-    .notification.show{transform:translateX(0)}
-    .progress{height:8px;background:#e9eef5;border-radius:999px;overflow:hidden;margin-top:8px}
-    .bar{height:100%;width:0;background:linear-gradient(90deg,#6a11cb,#2575fc)}
-    footer{margin-top:30px;text-align:center;color:#fff;font-size:14px}
-    small.note{color:#5b6b82;font-size:12px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ferramenta de Criativos com Texto em Inglês</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            margin-top: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            color: #ea4335;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 5px solid #1a73e8;
+        }
+        
+        .instructions h3 {
+            color: #1a73e8;
+            margin-bottom: 15px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+        }
+        
+        .input-section {
+            display: flex;
+            margin-bottom: 30px;
+            gap: 15px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            border-color: #1a73e8;
+            outline: none;
+        }
+        
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s, transform 0.2s;
+        }
+        
+        button:hover {
+            background: #1665d1;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+        }
+        
+        .filter-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #1a73e8;
+        }
+        
+        select, input[type="date"] {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .ad-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .ad-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .ad-image {
+            height: 200px;
+            overflow: hidden;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .ad-image img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .english-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #34a853;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ad-info {
+            padding: 15px;
+        }
+        
+        .ad-info h3 {
+            margin-bottom: 10px;
+            color: #1a73e8;
+        }
+        
+        .ad-info p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .ad-meta {
+            display: flex;
+            justify-content: space-between;
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .download-btn {
+            background: #34a853;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .download-btn:hover {
+            background: #2d9349;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #1a73e8;
+        }
+        
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(26, 115, 232, 0.3);
+            border-radius: 50%;
+            border-top-color: #1a73e8;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background: #4CAF50;
+            color: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background: #ea4335;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            gap: 10px;
+        }
+        
+        .pagination button {
+            background: #f1f1f1;
+            color: #1a73e8;
+            padding: 10px 15px;
+        }
+        
+        .pagination button.active {
+            background: #1a73e8;
+            color: white;
+        }
+        
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .input-section {
+                flex-direction: column;
+            }
+            
+            .filters {
+                flex-direction: column;
+            }
+            
+            .results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <h1>Ferramenta de Download de Imagens</h1>
-    <p class="subtitle">Encontre imagens com <strong>texto em inglês</strong> e baixe em 1 clique (OCR no navegador)</p>
-  </header>
-
-  <div class="container">
-    <div class="input-section">
-      <div class="ctrl" style="grid-column:1/2;">
-        <label for="siteUrl">URL do site (ex.: https://exemplo.com)</label>
-        <input type="url" id="siteUrl" placeholder="https://exemplo.com" value="">
-      </div>
-      <button id="searchBtn">Buscar Imagens</button>
-    </div>
-
-    <div class="row">
-      <div class="ctrl">
-        <label for="limit">Limite de imagens analisadas</label>
-        <input type="number" id="limit" min="1" max="200" value="40">
-      </div>
-      <div class="ctrl">
-        <label for="minConfidence">Confiança mínima do OCR (0–100)</label>
-        <input type="number" id="minConfidence" min="0" max="100" value="60">
-      </div>
-      <div class="ctrl">
-        <label for="lang">Idioma do OCR</label>
-        <input type="text" id="lang" value="eng" />
-        <small class="note">padrão: inglês (eng)</small>
-      </div>
-    </div>
-
-    <div id="status" class="loading">Digite uma URL e clique em “Buscar Imagens”.</div>
-    <div id="progressWrap" style="display:none;">
-      <div class="progress"><div id="progressBar" class="bar"></div></div>
-      <small id="progressText" class="note"></small>
-    </div>
-
-    <div id="resultsContainer" class="results"></div>
-  </div>
-
-  <div id="notification" class="notification">Pronto!</div>
-  <footer><p>&copy; 2025</p></footer>
-
-  <script>
-    const $ = s => document.querySelector(s);
-    const $$ = s => Array.from(document.querySelectorAll(s));
-
-    function toast(msg, ok=true) {
-      const el = document.querySelector('#notification');
-      el.textContent = msg;
-      el.style.background = ok ? '#4CAF50' : '#E53935';
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 2600);
-    }
-
-    function setProgress(pct, txt='') {
-      const bar = $('#progressBar'); 
-      const wrap = $('#progressWrap'); 
-      const lab = $('#progressText');
-      wrap.style.display = 'block'; 
-      bar.style.width = pct + '%'; 
-      lab.textContent = txt;
-      if (pct >= 100) setTimeout(()=> wrap.style.display='none', 600);
-    }
-
-    async function fetchImagesFromServer(url, limit){
-      const resp = await fetch(`/api/fetch-images?url=${encodeURIComponent(url)}&limit=${Number(limit)||40}`);
-      if(!resp.ok) throw new Error('Falha ao buscar imagens.');
-      return resp.json();
-    }
-
-    function renderCards(items){
-      const cont = $('#resultsContainer');
-      cont.innerHTML = '';
-      if(!items.length){
-        $('#status').innerHTML = '<div class="loading">Nenhuma imagem encontrada.</div>'; 
-        return;
-      }
-      $('#status').innerHTML = '';
-      items.forEach((u,i)=>{
-        const card = document.createElement('div');
-        card.className = 'image-card';
-        card.innerHTML = `
-          <div class="image-container"><img src="/api/proxy-image?url=${encodeURIComponent(u)}" alt="image"/></div>
-          <div class="image-info">
-            <h3>Imagem ${i+1}</h3>
-            <p>Pré-visualização via proxy (CORS-free).</p>
-            <div class="meta">Fonte: ${new URL(u).hostname}</div>
-            <div class="actions">
-              <div class="btn" data-url="${u}" data-name="img-${i}.jpg">Download</div>
-              <div class="btn" data-open="${u}">Abrir origem</div>
+    <header>
+        <h1>Ferramenta de Criativos com Texto em Inglês</h1>
+        <p class="subtitle">Busque e faça download de criativos do Google Ads Transparency</p>
+    </header>
+    
+    <div class="container">
+        <div class="instructions">
+            <h3>Como usar esta ferramenta:</h3>
+            <ol>
+                <li>Insira o ID do anunciante do Google Ads Transparency (ex: AR09499274345038479361)</li>
+                <li>Ajuste os filtros conforme necessário (data, formato, região)</li>
+                <li>Clique em "Buscar Criativos" para buscar anúncios</li>
+                <li>Os criativos com texto em inglês serão marcados com um selo verde</li>
+                <li>Clique em "Download" para salvar qualquer criativo de anúncio</li>
+            </ol>
+        </div>
+        
+        <div class="input-section">
+            <input type="text" id="advertiserId" placeholder="ID do Anunciante (ex: AR09499274345038479361)" value="AR09499274345038479361">
+            <button id="searchBtn">Buscar Criativos</button>
+        </div>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label for="dateFilter">Data de Publicação:</label>
+                <input type="date" id="dateFilter">
             </div>
-          </div>`;
-        cont.appendChild(card);
-      });
+            
+            <div class="filter-group">
+                <label for="formatFilter">Formato:</label>
+                <select id="formatFilter">
+                    <option value="all">Todos os Formatos</option>
+                    <option value="image">Imagem</option>
+                    <option value="video">Vídeo</option>
+                    <option value="text">Texto</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="regionFilter">Região:</label>
+                <select id="regionFilter">
+                    <option value="all">Todas as Regiões</option>
+                    <option value="us">Estados Unidos</option>
+                    <option value="br">Brasil</option>
+                    <option value="uk">Reino Unido</option>
+                    <option value="ca">Canadá</option>
+                    <option value="au">Austrália</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="languageFilter">Idioma do Texto:</label>
+                <select id="languageFilter">
+                    <option value="all">Todos os Idiomas</option>
+                    <option value="en" selected>Inglês</option>
+                    <option value="pt">Português</option>
+                    <option value="es">Espanhol</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="resultsContainer" class="results">
+            <div class="loading">
+                <p>Digite um ID de anunciante e clique em "Buscar Criativos" para começar</p>
+            </div>
+        </div>
+        
+        <div class="pagination">
+            <button id="prevPage">&laquo; Anterior</button>
+            <button class="active">1</button>
+            <button>2</button>
+            <button>3</button>
+            <button id="nextPage">Próxima &raquo;</button>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification">Download iniciado com sucesso!</div>
+    
+    <footer>
+        <p>Ferramenta de Busca de Criativos em Inglês &copy; 2023</p>
+        <p>Conectado ao backend: <span id="backendStatus">Simulação (clique para conectar com backend real)</span></p>
+    </footer>
 
-      $$('#resultsContainer .btn').forEach(b=>{
-        const u = b.getAttribute('data-url');
-        const name = b.getAttribute('data-name');
-        const o = b.getAttribute('data-open');
-        b.addEventListener('click', ()=>{
-          if (u) downloadViaProxy(u, name); else window.open(o, '_blank');
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchBtn = document.getElementById('searchBtn');
+            const advertiserIdInput = document.getElementById('advertiserId');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const notification = document.getElementById('notification');
+            const dateFilter = document.getElementById('dateFilter');
+            const languageFilter = document.getElementById('languageFilter');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const backendStatus = document.getElementById('backendStatus');
+            
+            // Definir data padrão como hoje
+            const today = new Date();
+            dateFilter.value = today.toISOString().split('T')[0];
+            
+            // Dados de exemplo para demonstração
+            const sampleAds = [
+                {
+                    id: 1,
+                    title: "Summer Special Offer",
+                    description: "Enjoy our exclusive discounts for the season. Limited time only!",
+                    imageUrl: "https://via.placeholder.com/300x200/4285F4/FFFFFF?text=Summer+Sale",
+                    date: "2023-07-15",
+                    regions: ["United States", "United Kingdom"],
+                    format: "image",
+                    hasEnglishText: true,
+                    englishConfidence: 95
+                },
+                {
+                    id: 2,
+                    title: "New Product Launch",
+                    description: "Discover our latest innovation in technology and design",
+                    imageUrl: "https://via.placeholder.com/300x200/34A853/FFFFFF?text=New+Product",
+                    date: "2023-08-02",
+                    regions: ["United States", "Canada"],
+                    format: "image",
+                    hasEnglishText: true,
+                    englishConfidence: 92
+                },
+                {
+                    id: 3,
+                    title: "Oferta Relâmpago",
+                    description: "Descontos incríveis por tempo limitado, não perca!",
+                    imageUrl: "https://via.placeholder.com/300x200/EA4335/FFFFFF?text=Oferta+Relâmpago",
+                    date: "2023-09-10",
+                    regions: ["Brasil", "Argentina"],
+                    format: "image",
+                    hasEnglishText: false,
+                    englishConfidence: 5
+                },
+                {
+                    id: 4,
+                    title: "Christmas Campaign",
+                    description: "Perfect gifts for the whole family at great prices",
+                    imageUrl: "https://via.placeholder.com/300x200/FBBC04/FFFFFF?text=Christmas+Deals",
+                    date: "2023-11-20",
+                    regions: ["United States", "United Kingdom", "Canada"],
+                    format: "image",
+                    hasEnglishText: true,
+                    englishConfidence: 97
+                }
+            ];
+            
+            // Função para mostrar notificação
+            function showNotification(message, isError = false) {
+                notification.textContent = message;
+                notification.className = isError ? 'notification error' : 'notification';
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+            
+            // Função para buscar anúncios (simulação)
+            function searchForAds(advertiserId, filters) {
+                resultsContainer.innerHTML = `
+                    <div class="loading">
+                        <p>Buscando criativos para ${advertiserId}...</p>
+                    </div>
+                `;
+                
+                // Simular tempo de busca
+                setTimeout(() => {
+                    if (!advertiserId || advertiserId.length < 10) {
+                        showNotification('ID de anunciante inválido. Use um ID válido como AR09499274345038479361', true);
+                        resultsContainer.innerHTML = `
+                            <div class="loading">
+                                <p>Digite um ID de anunciante válido e clique em "Buscar Criativos"</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Aplicar filtros
+                    let filteredAds = sampleAds;
+                    
+                    if (filters.language !== 'all') {
+                        filteredAds = filteredAds.filter(ad => 
+                            filters.language === 'en' ? ad.hasEnglishText : !ad.hasEnglishText
+                        );
+                    }
+                    
+                    if (filters.region !== 'all') {
+                        filteredAds = filteredAds.filter(ad => 
+                            ad.regions.some(region => 
+                                filters.region === 'us' ? region.includes('United') : 
+                                filters.region === 'br' ? region.includes('Brasil') :
+                                true
+                            )
+                        );
+                    }
+                    
+                    if (filters.format !== 'all') {
+                        filteredAds = filteredAds.filter(ad => ad.format === filters.format);
+                    }
+                    
+                    displayAds(filteredAds);
+                }, 2000);
+            }
+            
+            // Função para buscar anúncios (com backend real)
+            async function searchForAdsReal(advertiserId, filters) {
+                resultsContainer.innerHTML = `
+                    <div class="loading">
+                        <p>Buscando criativos para ${advertiserId}...</p>
+                    </div>
+                `;
+                
+                try {
+                    // URL do backend - substitua pela sua URL do Render
+                    const backendUrl = `/api/ads/${advertiserId}`;
+                    
+                    // Parâmetros de consulta
+                    const params = new URLSearchParams();
+                    if (filters.date) params.append('date', filters.date);
+                    if (filters.format !== 'all') params.append('format', filters.format);
+                    if (filters.region !== 'all') params.append('region', filters.region);
+                    if (filters.language !== 'all') params.append('language', filters.language);
+                    
+                    // Fazer requisição para o backend
+                    const response = await fetch(`${backendUrl}?${params}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erro no backend: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    displayAds(data.ads);
+                    
+                } catch (error) {
+                    console.error("Erro ao buscar anúncios:", error);
+                    showNotification("Erro ao conectar com o backend. Usando dados de simulação.", true);
+                    
+                    // Fallback para simulação em caso de erro
+                    setTimeout(() => {
+                        let filteredAds = sampleAds;
+                        
+                        if (filters.language !== 'all') {
+                            filteredAds = filteredAds.filter(ad => 
+                                filters.language === 'en' ? ad.hasEnglishText : !ad.hasEnglishText
+                            );
+                        }
+                        
+                        displayAds(filteredAds);
+                    }, 1000);
+                }
+            }
+            
+            // Função para exibir anúncios
+            function displayAds(ads) {
+                if (ads.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="loading">
+                            <p>Nenhum criativo foi encontrado para os filtros selecionados.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                resultsContainer.innerHTML = '';
+                
+                ads.forEach((ad) => {
+                    const adCard = document.createElement('div');
+                    adCard.className = 'ad-card';
+                    
+                    adCard.innerHTML = `
+                        <div class="ad-image">
+                            <img src="${ad.imageUrl}" alt="${ad.title}">
+                            ${ad.hasEnglishText ? `<div class="english-badge">Inglês (${ad.englishConfidence}%)</div>` : ''}
+                        </div>
+                        <div class="ad-info">
+                            <h3>${ad.title}</h3>
+                            <p>${ad.description}</p>
+                            <div class="ad-meta">
+                                <span>${ad.date}</span>
+                                <span>${ad.regions.join(', ')}</span>
+                            </div>
+                            <div class="download-btn" data-id="${ad.id}">Download</div>
+                        </div>
+                    `;
+                    
+                    resultsContainer.appendChild(adCard);
+                });
+                
+                // Adicionar event listeners para os botões de download
+                document.querySelectorAll('.download-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const adId = this.getAttribute('data-id');
+                        const ad = ads.find(a => a.id == adId);
+                        downloadAd(ad);
+                    });
+                });
+            }
+            
+            // Função para simular download
+            function downloadAd(ad) {
+                showNotification(`Download do criativo "${ad.title}" iniciado!`);
+                
+                // Em uma implementação real, aqui seria o código para baixar a imagem
+                console.log(`Downloading: ${ad.imageUrl}`);
+                
+                // Simular tempo de download
+                setTimeout(() => {
+                    showNotification(`Criativo "${ad.title}" baixado com sucesso!`);
+                    
+                    // Em uma implementação real, usaríamos algo como:
+                    const a = document.createElement('a');
+                    a.href = ad.imageUrl;
+                    a.download = `ad-${ad.id}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }, 1500);
+            }
+            
+            // Alternar entre modo simulação e backend real
+            backendStatus.addEventListener('click', function() {
+                if (backendStatus.textContent.includes('Simulação')) {
+                    backendStatus.textContent = "Modo backend ativo";
+                    backendStatus.style.color = "#34a853";
+                    backendStatus.style.fontWeight = "bold";
+                    showNotification("Modo backend ativado");
+                } else {
+                    backendStatus.textContent = "Simulação (clique para conectar com backend real)";
+                    backendStatus.style.color = "";
+                    backendStatus.style.fontWeight = "";
+                    showNotification("Modo simulação ativado");
+                }
+            });
+            
+            // Event listener para o botão de busca
+            searchBtn.addEventListener('click', function() {
+                const advertiserId = advertiserIdInput.value.trim();
+                const filters = {
+                    date: dateFilter.value,
+                    format: document.getElementById('formatFilter').value,
+                    region: document.getElementById('regionFilter').value,
+                    language: languageFilter.value
+                };
+                
+                if (!advertiserId) {
+                    showNotification('Por favor, digite um ID de anunciante válido.', true);
+                    return;
+                }
+                
+                if (backendStatus.textContent.includes('Simulação')) {
+                    searchForAds(advertiserId, filters);
+                } else {
+                    searchForAdsReal(advertiserId, filters);
+                }
+            });
+            
+            // Permitir busca com Enter
+            advertiserIdInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchBtn.click();
+                }
+            });
+            
+            // Paginação
+            prevPageBtn.addEventListener('click', function() {
+                showNotification('Carregando página anterior...');
+            });
+            
+            nextPageBtn.addEventListener('click', function() {
+                showNotification('Carregando próxima página...');
+            });
+            
+            // Inicializar com o ID fornecido
+            searchForAds(advertiserIdInput.value.trim(), {
+                date: dateFilter.value,
+                format: document.getElementById('formatFilter').value,
+                region: document.getElementById('regionFilter').value,
+                language: languageFilter.value
+            });
         });
-      });
-    }
-
-    async function downloadViaProxy(url, filename){
-      try{
-        const res = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
-        if(!res.ok) throw new Error('proxy falhou');
-        const blob = await res.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename || 'image.jpg';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(a.href), 1400);
-        toast('Download iniciado');
-      }catch(e){ toast('Não foi possível baixar.', false); }
-    }
-
-    async function ocrImgElement(imgEl, lang='eng'){
-      const canvas = document.createElement('canvas');
-      canvas.width = imgEl.naturalWidth; 
-      canvas.height = imgEl.naturalHeight;
-      const ctx = canvas.getContext('2d'); 
-      ctx.drawImage(imgEl,0,0);
-      const r = await Tesseract.recognize(canvas, lang);
-      const words = r.data.words || [];
-      const conf = words.length ? (words.reduce((s,w)=> s + (w.confidence||0), 0) / words.length) : (r.data.confidence || 0);
-      return { text: (r.data.text || '').trim(), confidence: conf };
-    }
-
-    async function analyzeWithOCR(minConfidence, lang){
-      const cards = $$('#resultsContainer .image-card');
-      let passed = 0;
-      for (let i=0;i<cards.length;i++){
-        const img = cards[i].querySelector("img");
-        setProgress(Math.min(95, Math.round(((i+1)/cards.length)*90)+5), `OCR ${i+1}/${cards.length}`);
-        try{
-          const { text, confidence } = await ocrImgElement(img, lang);
-          const maybeEnglish = /[A-Za-z]/.test(text) && !/[À-ÖØ-öø-ÿ]/.test(text);
-          const meta = cards[i].querySelector('.meta');
-          meta.textContent += ` | OCR: ${Math.round(confidence)}%`;
-          if (!(maybeEnglish && confidence >= minConfidence)) {
-            cards[i].style.opacity = .35;
-          } else {
-            passed++;
-            const p = cards[i].querySelector('.image-info p');
-            p.textContent = text.slice(0, 150) + (text.length>150?'…':'');
-          }
-        }catch {}
-      }
-      setProgress(100, 'Concluído');
-      toast(`${passed} imagem(ns) com texto em inglês acima de ${minConfidence}%`);
-    }
-
-    document.querySelector('#searchBtn').addEventListener('click', async ()=>{
-      const url = document.querySelector('#siteUrl').value.trim();
-      const limit = Number(document.querySelector('#limit').value) || 40;
-      const minConf = Number(document.querySelector('#minConfidence').value) || 60;
-      const lang = (document.querySelector('#lang')?.value || 'eng').trim();
-
-      if(!/^https?:\/\//.test(url)){ toast('Digite uma URL válida começando com http(s)://', false); return; }
-
-      $('#resultsContainer').innerHTML = '';
-      $('#status').innerHTML = '<div class="loading">Buscando imagens…</div>';
-      setProgress(8, 'Coletando…');
-
-      try{
-        const data = await fetchImagesFromServer(url, limit);
-        if(!data.ok || !data.images?.length){ $('#status').innerHTML = '<div class="loading">Sem imagens detectadas.</div>'; setProgress(100,''); return; }
-        renderCards(data.images);
-        await analyzeWithOCR(minConf, lang);
-      }catch(e){
-        $('#status').innerHTML = '<div class="loading">Erro: não consegui buscar imagens.</div>';
-        setProgress(100,'');
-        toast('Falha na coleta', false);
-      }
-    });
-
-    document.querySelector('#siteUrl').addEventListener('keypress', e => {
-      if (e.key === 'Enter') document.querySelector('#searchBtn').click();
-    });
-  </script>
+    </script>
 </body>
 </html>
