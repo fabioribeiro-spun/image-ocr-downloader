@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "puppeteer browsers install chromium"
   },
   "engines": {
     "node": "20.x"
@@ -15,7 +16,6 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "morgan": "^1.10.0",
-    "puppeteer": "^22.13.0"
+    "puppeteer": "21.9.0"
   }
 }
-
