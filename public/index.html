@@ -1,74 +1,65 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Coletor Ads Transparency</title>
-<style>
-  body{font:16px/1.5 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:#0f172a;color:#e5e7eb;margin:0}
-  .wrap{max-width:860px;margin:40px auto;padding:0 20px}
-  h1{color:#93c5fd;margin:0 0 10px}
-  .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px;margin-top:16px}
-  a.bm{display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:10px;font-weight:700}
-  code{background:#0b1220;border:1px solid #1f2937;padding:2px 6px;border-radius:6px}
-  ol{margin-left:20px}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <h1>Coletor de criativos (Google Ads Transparency)</h1>
-
-  <div class="card">
-    <p>Arraste o botão para sua barra de favoritos. Abra a página do anunciante no Ads Transparency e clique no favorito.</p>
-    <p><a id="bm" class="bm" href="#">🔖 Arraste para os favoritos</a></p>
-    <p>Ele coleta as imagens <em>no site do Google</em> e abre uma aba neste app para fazer OCR em inglês e baixar o ZIP.</p>
-  </div>
-
-  <div class="card">
-    <h3>Fluxo</h3>
-    <ol>
-      <li>Bookmarklet coleta até 80–100 imagens visíveis (inclui <code>img</code>, <code>srcset</code> e <code>background-image</code>).</li>
-      <li>Abre <code>/ocr.html</code> neste domínio e envia as URLs via <code>postMessage</code>.</li>
-      <li><code>/ocr.html</code> roda Tesseract (eng), filtra só inglês (ASCII) com confiança ≥ 60% e baixa o ZIP.</li>
-    </ol>
-  </div>
-</div>
-
 <script>
-(function makeBookmarklet(){
-  const BASE = location.origin;
-  const target = BASE + "/ocr.html";
-  const js = `
-    (()=>{
-      const BASE='${BASE}';
-      const target='${target}';
-      const getBg=(el)=>{try{const bg=getComputedStyle(el).backgroundImage;
-        return[...bg.matchAll(/url\\((?:'|")?(.*?)(?:'|")?\\)/g)].map(m=>m[1])}catch{return[]}};
-      const uniq=new Set(); const minW=120,minH=120,max=100,scrollN=8,delay=800;
-      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-      (async()=>{
-        for(let i=0;i<scrollN;i++){window.scrollBy(0,window.innerHeight*1.25);await sleep(delay)}
-        ;[...document.images].forEach(im=>{
-          if((im.naturalWidth||im.width)>=minW&&(im.naturalHeight||im.height)>=minH){
-            const u=im.currentSrc||im.src; if(u) uniq.add(u);
-          }
-        });
-        document.querySelectorAll('source[srcset]').forEach(s=>{
-          const f=(s.getAttribute('srcset')||'').split(',')[0].trim().split(' ')[0]; if(f) uniq.add(f);
-        });
-        document.querySelectorAll('*').forEach(el=>getBg(el).forEach(u=>uniq.add(u)));
-        const urls=[...uniq].filter(u=>/^https?:\\/\\//.test(u)&&!/\\.svg($|\\?)/i.test(u)&&!u.startsWith('data:')).slice(0,max);
-        if(!urls.length){alert('Nada coletado. Role mais e tente novamente.');return}
-        const w=window.open(target,'_blank');
-        const send=()=>w&&w.postMessage({type:'ads-urls',urls}, BASE);
-        const t=setInterval(()=>{try{send();clearInterval(t)}catch{}}, 500);
-      })();
-    })();
-  `.trim();
+  // Gera o bookmarklet com BASE = mesmo host do app
+  (function(){
+    const BASE   = location.origin;
+    const TARGET = BASE + "/ocr.html";
 
-  const a = document.getElementById('bm');
-  a.href = "javascript:" + encodeURIComponent(js).replace(/%20/g," ");
-})();
+    // ---- Bookmarklet (minificado) ----
+    const js = `
+    (()=>{const BASE='${BASE}',TARGET='${TARGET}';
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const getBgUrls=el=>{try{const s=getComputedStyle(el).backgroundImage;
+        return[...s.matchAll(/url\\((?:'|")?(.*?)(?:'|")?\\)/g)].map(m=>m[1])}catch{return[]}};
+      // entra em shadowRoots e iframes same-origin
+      const collectFromRoot=root=>{
+        const urls=new Set();
+        const pick=(u)=>{ if(u && /^https?:\\/\\//.test(u) && !/\\.svg(\\?|$)/i.test(u) && !u.startsWith('data:')) urls.add(u) };
+        // imgs
+        root.querySelectorAll('img').forEach(img=>{
+          // pega a maior do srcset se houver
+          let u=img.currentSrc||img.src;
+          const ss=img.getAttribute('srcset');
+          if(ss){ try{
+            const parts=ss.split(',').map(x=>x.trim().split(' '));
+            parts.sort((a,b)=>parseInt((b[1]||'0').replace(/\\D/g,'')) - parseInt((a[1]||'0').replace(/\\D/g,'')));
+            if(parts[0] && parts[0][0]) u=parts[0][0];
+          }catch{} }
+          pick(u);
+        });
+        // backgrounds
+        root.querySelectorAll('*').forEach(el=> getBgUrls(el).forEach(pick));
+        // shadow roots
+        root.querySelectorAll('*').forEach(el=>{ if(el.shadowRoot){ for(const u of collectFromRoot(el.shadowRoot)) urls.add(u); }});
+        return urls;
+      };
+
+      const uniq=new Set();
+      (async()=>{
+        // rola para disparar lazy-loading
+        for(let i=0;i<10;i++){ window.scrollBy(0, innerHeight*1.25); await sleep(800); }
+
+        // 1) coleta no documento principal
+        for(const u of collectFromRoot(document)) uniq.add(u);
+
+        // 2) tenta entrar em iframes same-origin (alguns blocos do app estão neles)
+        document.querySelectorAll('iframe').forEach(iframe=>{
+          try{
+            const doc=iframe.contentDocument;
+            if(doc){ for(const u of collectFromRoot(doc)) uniq.add(u); }
+          }catch{} // cross-origin -> ignorar
+        });
+
+        const urls=[...uniq].slice(0,150);
+        if(!urls.length){ alert('Nada coletado. Role mais e clique no favorito novamente.'); return; }
+
+        // abre o processador (ocr.html) e envia via postMessage
+        const w=window.open(TARGET,'_blank');
+        const send=()=>{ try{ w.postMessage({type:'ads-urls',urls}, BASE); }catch{} };
+        const t=setInterval(()=>{ send(); clearInterval(t); }, 500);
+      })();
+    })();`.trim();
+
+    const a = document.getElementById("bm");
+    a.href = "javascript:" + encodeURIComponent(js).replace(/%20/g," ");
+  })();
 </script>
-</body>
-</html>
