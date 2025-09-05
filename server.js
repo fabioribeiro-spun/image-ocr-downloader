@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const puppeteer = require('puppeteer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,127 +16,144 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Rota para buscar anúncios REAIS (simulados mas personalizados)
+// Rota para buscar anúncios REAIS
 app.get('/api/ads/:advertiserId', async (req, res) => {
+    let browser;
     try {
         const { advertiserId } = req.params;
         const { region = 'anywhere' } = req.query;
         
-        console.log(`📦 Buscando anúncios para: ${advertiserId}, região: ${region}`);
+        console.log(`🎯 Tentando scraping REAL para: ${advertiserId}`);
         
-        // Gerar dados simulados mas REALISTAS baseados no ID
-        const ads = generateRealisticAds(advertiserId, region);
-        
-        res.json({ 
-            success: true,
-            ads: ads,
-            total: ads.length,
-            advertiserId: advertiserId,
-            region: region,
-            timestamp: new Date().toISOString()
+        // Configuração otimizada para Render
+        browser = await puppeteer.launch({
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+            ],
+            headless: true,
+            timeout: 30000
         });
+
+        const page = await browser.newPage();
+        
+        // Configurar cabeçalhos para parecer humano
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        await page.setViewport({ width: 1280, height: 800 });
+        
+        // URL do Google Ads Transparency
+        const url = `https://adstransparency.google.com/advertiser/${advertiserId}?region=${region}`;
+        console.log(`🌐 Acessando: ${url}`);
+        
+        await page.goto(url, { 
+            waitUntil: 'networkidle2',
+            timeout: 60000
+        });
+
+        // Aguardar e tentar encontrar anúncios
+        await page.waitForTimeout(5000);
+        
+        // Extrair dados REAIS
+        const realAds = await page.evaluate(() => {
+            const ads = [];
+            const adElements = document.querySelectorAll('[data-testid="ad-card"], .ad-card, .creative-container, [class*="ad"], [class*="creative"]');
+            
+            adElements.forEach((element, index) => {
+                try {
+                    // Extrair imagem
+                    const imgElement = element.querySelector('img');
+                    const imageUrl = imgElement ? imgElement.src : '';
+                    
+                    // Extrair texto
+                    const textContent = element.textContent;
+                    const hasEnglish = /[a-zA-Z]/.test(textContent) && textContent.length > 10;
+                    
+                    ads.push({
+                        id: index + 1,
+                        title: `Ad ${index + 1}`,
+                        description: textContent.slice(0, 150) + '...',
+                        imageUrl: imageUrl,
+                        date: new Date().toLocaleDateString(),
+                        regions: ['Global'],
+                        format: "image",
+                        hasEnglishText: hasEnglish,
+                        englishConfidence: hasEnglish ? 85 : 15,
+                        source: 'real'
+                    });
+                } catch (error) {
+                    console.log('Erro ao extrair anúncio:', error);
+                }
+            });
+            
+            return ads;
+        });
+
+        await browser.close();
+        
+        if (realAds.length > 0) {
+            console.log(`✅ Sucesso! Encontrados ${realAds.length} anúncios reais`);
+            res.json({ 
+                success: true,
+                ads: realAds,
+                total: realAds.length,
+                source: 'real-scraping'
+            });
+        } else {
+            console.log('⚠️  Nenhum anúncio real encontrado, usando dados simulados');
+            res.json({ 
+                success: true,
+                ads: generateRealisticAds(advertiserId, region),
+                total: 0,
+                source: 'simulation-fallback'
+            });
+        }
         
     } catch (error) {
-        console.error('❌ Erro:', error);
-        res.status(500).json({ 
+        console.error('❌ Erro no scraping:', error);
+        if (browser) await browser.close();
+        
+        // Fallback para dados simulados
+        res.json({ 
             success: false,
+            ads: generateRealisticAds(req.params.advertiserId, req.query.region),
             error: error.message,
-            ads: getFallbackAds()
+            source: 'error-fallback'
         });
     }
 });
 
-// Gerar anúncios REALISTAS baseados no ID
+// Função de fallback
 function generateRealisticAds(advertiserId, region) {
-    const baseNumber = parseInt(advertiserId.replace(/\D/g, '').slice(-6)) || 100000;
-    const adCount = (baseNumber % 6) + 2; // 2-7 anúncios
-    
-    const ads = [];
-    const regions = region === 'BR' ? 
-        ['Brasil', 'São Paulo', 'Rio de Janeiro'] : 
-        ['Estados Unidos', 'Reino Unido', 'Canadá', 'Austrália', 'Global'];
-    
-    const formats = ['image', 'video', 'carousel'];
-    const industries = ['Tecnologia', 'E-commerce', 'Saúde', 'Educação', 'Finanças', 'Viagens'];
-    
-    for (let i = 1; i <= adCount; i++) {
-        const adNumber = baseNumber + i;
-        const industry = industries[adNumber % industries.length];
-        const format = formats[adNumber % formats.length];
-        const hasEnglish = region !== 'BR' || Math.random() > 0.7;
-        
-        ads.push({
-            id: `AD-${advertiserId.slice(-8)}-${adNumber}`,
-            title: hasEnglish ? 
-                `${industry} Campaign ${adNumber}` : 
-                `Campanha de ${industry} ${adNumber}`,
-            description: hasEnglish ?
-                `Promoting ${industry} solutions across ${region}. Unique engagement opportunities available.` :
-                `Promovendo soluções de ${industry} na região ${region}. Oportunidades únicas de engajamento.`,
-            imageUrl: `https://picsum.photos/400/300?random=${adNumber}&blur=2`,
-            date: new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-            regions: [regions[adNumber % regions.length]],
-            format: format,
-            hasEnglishText: hasEnglish,
-            englishConfidence: hasEnglish ? 80 + (adNumber % 20) : adNumber % 30,
-            advertiserId: advertiserId,
-            metrics: {
-                impressions: Math.floor(Math.random() * 1000000),
-                clicks: Math.floor(Math.random() * 10000),
-                ctr: (Math.random() * 5 + 1).toFixed(2) + '%'
-            }
-        });
-    }
-    
-    return ads;
-}
-
-// Dados de fallback
-function getFallbackAds() {
+    // ... (manter a função anterior de dados simulados)
     return [{
         id: "fallback-1",
-        title: "Example Campaign",
-        description: "Sample advertisement for testing purposes",
+        title: "Exemplo (scraping falhou)",
+        description: "O scraping real não funcionou. Estamos usando dados simulados.",
         imageUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=400&h=300&fit=crop",
         date: new Date().toLocaleDateString('pt-BR'),
-        regions: ["Global"],
+        regions: [region || "Global"],
         format: "image",
         hasEnglishText: true,
-        englishConfidence: 95
+        englishConfidence: 95,
+        source: 'simulation'
     }];
 }
 
-// Rota de saúde
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
-        status: '✅ ONLINE',
-        message: 'Servidor operacional',
+        status: '✅ ONLINE', 
         environment: process.env.NODE_ENV || 'development',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        puppeteer: 'enabled'
     });
 });
 
-// Rota de teste para seus IDs específicos
-app.get('/api/debug/:advertiserId', (req, res) => {
-    const { advertiserId } = req.params;
-    const { region = 'anywhere' } = req.query;
-    
-    res.json({
-        debug: true,
-        advertiserId: advertiserId,
-        region: region,
-        suggestedUrl: `https://adstransparency.google.com/advertiser/${advertiserId}?region=${region}`,
-        generatedAds: generateRealisticAds(advertiserId, region).length,
-        status: 'active'
-    });
-});
-
-// Iniciar servidor
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Health: http://localhost:${PORT}/api/health`);
-    console.log(`🔍 Exemplo: http://localhost:${PORT}/api/ads/AR09499274345038479361`);
-    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug/AR15466515195282587649`);
+    console.log(`🚀 Servidor com Puppeteer rodando na porta ${PORT}`);
 });
