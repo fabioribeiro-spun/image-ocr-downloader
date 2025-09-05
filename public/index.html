@@ -1,141 +1,74 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Coletor de Anúncios (Google Ads Transparency)</title>
-  <style>
-    body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}
-    .wrap{max-width:880px;margin:40px auto;padding:0 20px}
-    h1{font-size:28px;margin:0 0 12px;color:#93c5fd}
-    .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:20px;margin-top:16px}
-    code,kbd{background:#0b1220;border:1px solid #1f2937;padding:2px 6px;border-radius:6px}
-    a.bm{display:inline-block;margin-top:10px;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:10px;font-weight:700}
-    .muted{color:#9ca3af}
-    ol{margin-left:20px}
-    .ok{color:#86efac}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coletor Ads Transparency</title>
+<style>
+  body{font:16px/1.5 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:#0f172a;color:#e5e7eb;margin:0}
+  .wrap{max-width:860px;margin:40px auto;padding:0 20px}
+  h1{color:#93c5fd;margin:0 0 10px}
+  .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px;margin-top:16px}
+  a.bm{display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:10px;font-weight:700}
+  code{background:#0b1220;border:1px solid #1f2937;padding:2px 6px;border-radius:6px}
+  ol{margin-left:20px}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Coletor (OCR inglês) para Google Ads Transparency</h1>
+<div class="wrap">
+  <h1>Coletor de criativos (Google Ads Transparency)</h1>
 
-    <div class="card">
-      <p>Este bookmarklet roda <strong>OCR (eng)</strong> no seu navegador, aprova só criativos com <em>texto em inglês</em> e manda baixar um ZIP via este servidor.</p>
-      <p class="muted">Use em páginas como:<br>
-        <code>https://adstransparency.google.com/advertiser/AR...?... </code>
-      </p>
-      <p><a id="bm" class="bm" href="#">🔖 Arraste este botão para a sua barra de favoritos</a></p>
-      <p class="muted">Depois, abra a página do anunciante e clique no favorito.</p>
-    </div>
-
-    <div class="card">
-      <h3>Como funciona</h3>
-      <ol>
-        <li>Rola a página para carregar mais criativos.</li>
-        <li>Coleta URLs de imagens (inclui <code>&lt;img&gt;</code>, <code>srcset</code> e <code>background-image</code>).</li>
-        <li>Roda OCR com <code>eng</code> na imagem via <code>/api/proxy-image</code>.</li>
-        <li>Aprova só se for inglês (ASCII) e confiança ≥ <code>60%</code> (ajustável).</li>
-        <li>Envia aprovadas para <code>/api/download-zip</code> e baixa.</li>
-      </ol>
-      <p class="ok">Tudo isso sem Puppeteer no servidor 🤝</p>
-    </div>
+  <div class="card">
+    <p>Arraste o botão para sua barra de favoritos. Abra a página do anunciante no Ads Transparency e clique no favorito.</p>
+    <p><a id="bm" class="bm" href="#">🔖 Arraste para os favoritos</a></p>
+    <p>Ele coleta as imagens <em>no site do Google</em> e abre uma aba neste app para fazer OCR em inglês e baixar o ZIP.</p>
   </div>
 
-  <script>
-    // Gera o bookmarklet dinamicamente com o BASE = mesmo host do app
-    (function(){
-      const BASE = window.location.origin;
-      const API_ZIP = BASE + "/api/download-zip";
-      const PROXY_FN = "const PROXY=u=>'" + BASE + "/api/proxy-image?url=' + encodeURIComponent(u);";
+  <div class="card">
+    <h3>Fluxo</h3>
+    <ol>
+      <li>Bookmarklet coleta até 80–100 imagens visíveis (inclui <code>img</code>, <code>srcset</code> e <code>background-image</code>).</li>
+      <li>Abre <code>/ocr.html</code> neste domínio e envia as URLs via <code>postMessage</code>.</li>
+      <li><code>/ocr.html</code> roda Tesseract (eng), filtra só inglês (ASCII) com confiança ≥ 60% e baixa o ZIP.</li>
+    </ol>
+  </div>
+</div>
 
-      // === Bookmarklet (mesma lógica que combinamos) ===
-      const blob = `
+<script>
+(function makeBookmarklet(){
+  const BASE = location.origin;
+  const target = BASE + "/ocr.html";
+  const js = `
+    (()=>{
+      const BASE='${BASE}';
+      const target='${target}';
+      const getBg=(el)=>{try{const bg=getComputedStyle(el).backgroundImage;
+        return[...bg.matchAll(/url\\((?:'|")?(.*?)(?:'|")?\\)/g)].map(m=>m[1])}catch{return[]}};
+      const uniq=new Set(); const minW=120,minH=120,max=100,scrollN=8,delay=800;
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       (async()=>{
-        const API_ZIP='${API_ZIP}';
-        ${PROXY_FN}
-        const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-        const minConf=60,scrollTimes=10,scrollDelay=900,maxImgs=150,minW=120,minH=120;
-
-        function loadTess(){
-          return new Promise((res,rej)=>{
-            if(window.Tesseract){res();return}
-            const s=document.createElement('script');
-            s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-            s.onload=res; s.onerror=()=>rej(new Error('Falha ao carregar Tesseract.js'));
-            document.head.appendChild(s);
-          });
-        }
-
-        const getBg=(el)=>{try{
-          const bg=getComputedStyle(el).backgroundImage;
-          return[...bg.matchAll(/url\\((?:'|")?(.*?)(?:'|")?\\)/g)].map(m=>m[1])
-        }catch{return[]}}
-        const uniq=new Set();
-        for(let i=0;i<scrollTimes;i++){window.scrollBy(0,window.innerHeight*1.25);await sleep(scrollDelay)}
-        ;[...document.images].forEach(img=>{
-          if((img.naturalWidth||img.width)>=minW&&(img.naturalHeight||img.height)>=minH){
-            const u=img.currentSrc||img.src; if(u) uniq.add(u);
+        for(let i=0;i<scrollN;i++){window.scrollBy(0,window.innerHeight*1.25);await sleep(delay)}
+        ;[...document.images].forEach(im=>{
+          if((im.naturalWidth||im.width)>=minW&&(im.naturalHeight||im.height)>=minH){
+            const u=im.currentSrc||im.src; if(u) uniq.add(u);
           }
         });
         document.querySelectorAll('source[srcset]').forEach(s=>{
-          const first=(s.getAttribute('srcset')||'').split(',')[0].trim().split(' ')[0];
-          if(first) uniq.add(first);
+          const f=(s.getAttribute('srcset')||'').split(',')[0].trim().split(' ')[0]; if(f) uniq.add(f);
         });
         document.querySelectorAll('*').forEach(el=>getBg(el).forEach(u=>uniq.add(u)));
-
-        let urls=[...uniq].filter(u=>/^https?:\\/\\//.test(u)&&!/\\.svg($|\\?)/i.test(u)&&!u.startsWith('data:')).slice(0,maxImgs);
-        if(!urls.length){alert('Nenhuma imagem encontrada. Role mais e tente de novo.');return}
-
-        await loadTess();
-        const approved=[];
-        const isAscii=(t)=>/[A-Za-z]/.test(t)&&!/[À-ÖØ-öø-ÿ]/.test(t);
-
-        const bar=document.createElement('div');
-        Object.assign(bar.style,{position:'fixed',top:'10px',left:'50%',transform:'translateX(-50%)',padding:'8px 12px',background:'#111',color:'#fff',font:'600 13px system-ui',borderRadius:'8px',zIndex:999999});
-        document.body.appendChild(bar);
-        let done=0;
-
-        for(const raw of urls){
-          bar.textContent=\`OCR (eng) \${++done}/\${urls.length}\`;
-          try{
-            const prox=PROXY(raw);
-            const img=await new Promise((res,rej)=>{
-              const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.crossOrigin='anonymous'; im.src=prox;
-            });
-            const cv=document.createElement('canvas');
-            cv.width=img.naturalWidth; cv.height=img.naturalHeight;
-            const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
-            const r=await Tesseract.recognize(cv,'eng');
-            const words=r.data.words||[];
-            const conf=words.length?words.reduce((s,w)=>s+(w.confidence||0),0)/words.length:(r.data.confidence||0);
-            const text=(r.data.text||'').trim();
-            if(isAscii(text)&&conf>=minConf){approved.push(raw)}
-          }catch(e){}
-          await sleep(60);
-        }
-        document.body.removeChild(bar);
-
-        if(!approved.length){alert('Nenhuma imagem com texto em inglês ≥ '+minConf+'%.');return}
-        if(!confirm(\`Aprovadas \${approved.length} de \${urls.length}. Gerar ZIP?\`)) return;
-
-        try{
-          const resp=await fetch(API_ZIP,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls:approved})});
-          if(!resp.ok) throw new Error('Falha no servidor');
-          const blob=await resp.blob();
-          const a=document.createElement('a');
-          a.href=URL.createObjectURL(blob); a.download='ads-english.zip'; a.click();
-          setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-        }catch(e){console.error(e); alert('Erro ao gerar ZIP')}
-      })();`.trim();
-
-      const href = "javascript:" + encodeURIComponent(blob)
-        // Safari/Firefox aceitam sem encode; mas encodeURIComponent deixa seguro para drag&drop.
-        .replace(/%20/g, " ");
-
-      const a = document.getElementById("bm");
-      a.href = href;
+        const urls=[...uniq].filter(u=>/^https?:\\/\\//.test(u)&&!/\\.svg($|\\?)/i.test(u)&&!u.startsWith('data:')).slice(0,max);
+        if(!urls.length){alert('Nada coletado. Role mais e tente novamente.');return}
+        const w=window.open(target,'_blank');
+        const send=()=>w&&w.postMessage({type:'ads-urls',urls}, BASE);
+        const t=setInterval(()=>{try{send();clearInterval(t)}catch{}}, 500);
+      })();
     })();
-  </script>
+  `.trim();
+
+  const a = document.getElementById('bm');
+  a.href = "javascript:" + encodeURIComponent(js).replace(/%20/g," ");
+})();
+</script>
 </body>
 </html>
