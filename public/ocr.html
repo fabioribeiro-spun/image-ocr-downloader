@@ -41,6 +41,7 @@
       <button id="next" class="ghost">Próxima rodada →</button>
       <button id="paste" class="ghost">Colar do clipboard</button>
       <button id="pasteStart" class="ghost">Colar & Iniciar</button>
+      <button id="preview" class="ghost">Pré-visualizar lote</button>
     </div>
 
     <small class="muted">Critério “inglês”: contém letras A–Z e não contém acentos (ASCII).</small>
@@ -121,6 +122,47 @@ function drawScaled(img, maxSide){
   cv.getContext("2d").drawImage(img, 0, 0, w, h);
   return cv;
 }
+<script>
+/* … código existente … */
+
+function normalizeGImage(u) {
+  try {
+    // Alvos comuns de miniaturas do Google
+    const hostRe = /(lh\d+\.googleusercontent\.com|ggpht\.com|tpc\.googlesyndication\.com|gstatic\.com)/i;
+    if (!hostRe.test(u)) return u;
+
+    // Remove sufixos de redimensionamento já existentes (=s###, =w###-h###, -rw, etc.)
+    let base = u.replace(/=s\d+(-[a-z-]+)*/i, '')
+                .replace(/=w\d+-h\d+(-[a-z-]+)*/i, '')
+                .replace(/-rw\b/gi, '')
+                .replace(/-no\b/gi, '')
+                .replace(/(&|\?)imgdl=\d+/i, '')
+                .replace(/(&|\?)quality=\d+/i, '');
+
+    // Garante um tamanho grande (s1600 costuma vir em alta; s0 é “original” em alguns hosts)
+    // Prefiro s1600 por ser bem estável:
+    if (base.includes('?')) base = base.split('?')[0];
+    if (!/=s\d+/.test(base)) base += '=s1600';
+
+    return base;
+  } catch { return u; }
+}
+
+// Util para debug: mostra thumbs do lote atual
+async function debugPreview(urls) {
+  const w = window.open('', '_blank');
+  if (!w) return alert('Pop-up bloqueado. Libere pop-ups para ver a prévia.');
+  w.document.write('<title>Prévia do lote</title><style>body{background:#0b1220;color:#eee;font-family:sans-serif}img{max-width:320px;margin:6px;border-radius:8px;border:1px solid #1f2937}</style><div id="g"></div>');
+  const g = w.document.getElementById('g');
+  for (const u of urls) {
+    const nu = normalizeGImage(u);
+    const img = await loadImage(normalizeGImage(u));
+    img.src = PROXY(nu);
+    img.title = nu;
+    g.appendChild(img);
+  }
+}
+</script>
 
 async function runOCRBatch(){
   if (!urlsAll.length) parseBoxToList();
@@ -200,6 +242,7 @@ window.addEventListener("message", (e)=>{
     urlsAll = d.urls.filter(Boolean);
     box.value = urlsAll.join("\n");
     updateBadge();
+$('#preview').onclick = ()=> { const urls = currentBatch(); if (!urls.length) return alert('Sem URLs no lote.'); debugPreview(urls); };
   }
 });
 // se nada chegar, segue vida com colar manual
