@@ -1,265 +1,257 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OCR (eng) • Ads Transparency (lotes)</title>
-<style>
-  body{font:16px/1.5 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:#0f172a;color:#e5e7eb;margin:0}
-  .wrap{max-width:960px;margin:30px auto;padding:0 20px}
-  .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .bar{position:relative;background:#0b1220;border:1px solid #1f2937;height:14px;border-radius:8px;overflow:hidden;margin-top:10px}
-  .bar>i{position:absolute;top:0;left:0;height:100%;background:#10b981;width:0%}
-  button{background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
-  button.ghost{background:#374151}
-  input[type=number]{width:90px}
-  textarea{width:100%;height:220px;margin-top:10px;border-radius:8px;background:#0b1220;border:1px solid #1f2937;color:#e5e7eb}
-  small, .muted{color:#9ca3af}
-  .pill{display:inline-block;padding:3px 8px;border:1px solid #1f2937;border-radius:999px;background:#0b1220}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OCR (eng) • Ads Transparency — por Lotes</title>
+  <style>
+    :root{color-scheme:dark}
+    body{font:16px/1.5 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:#0f172a;color:#e5e7eb;margin:0}
+    .wrap{max-width:960px;margin:30px auto;padding:0 20px}
+    .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .bar{position:relative;background:#0b1220;border:1px solid #1f2937;height:14px;border-radius:8px;overflow:hidden;margin-top:10px}
+    .bar>i{position:absolute;top:0;left:0;height:100%;background:#10b981;width:0%}
+    button{background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    button.ghost{background:#374151}
+    input[type=number]{width:90px}
+    textarea{width:100%;height:220px;margin-top:10px;border-radius:8px;background:#0b1220;border:1px solid #1f2937;color:#e5e7eb}
+    small,.muted{color:#9ca3af}
+    .pill{display:inline-block;padding:3px 8px;border:1px solid #1f2937;border-radius:999px;background:#0b1220}
+    /* preview modal */
+    .ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:saturate(140%) blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999}
+    .box{max-width:1000px;width:90vw;max-height:85vh;overflow:auto;background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:14px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .thumb{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:6px;display:flex;align-items:center;justify-content:center;aspect-ratio:1/1;overflow:hidden}
+    .thumb img{max-width:100%;max-height:100%;display:block}
+    .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .hd h3{margin:0;font-size:16px}
+    .xbtn{background:#ef4444}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h2>OCR (English) & Zip — por Lotes</h2>
-    <p class="muted">Esta aba recebe as URLs do coletor. Se nada chegar automaticamente, cole manualmente (1 por linha) e use os botões abaixo.</p>
+  <div class="wrap">
+    <div class="card">
+      <h2>OCR (English) & Zip — por Lotes</h2>
+      <p class="muted">Esta aba recebe as URLs do coletor. Se nada chegar automaticamente, cole manualmente (1 por linha) e use os botões abaixo.</p>
 
-    <div class="row" style="margin-bottom:8px">
-      <label>Min. confiança (%):
-        <input id="conf" type="number" value="60" min="0" max="100">
-      </label>
-      <label>Tam. do lote:
-        <input id="batch" type="number" value="30" min="5" max="100">
-      </label>
-      <span id="badge" class="pill">Rodada 1/1</span>
+      <div class="row" style="margin-bottom:8px">
+        <label>Min. confiança (%):
+          <input id="conf" type="number" value="60" min="0" max="100">
+        </label>
+        <label>Tam. do lote:
+          <input id="batch" type="number" value="30" min="5" max="100">
+        </label>
+        <span id="badge" class="pill">Rodada 1/1</span>
+      </div>
+
+      <div class="row" style="margin-bottom:8px">
+        <button id="start">Iniciar lote</button>
+        <button id="prev" class="ghost">← Rodada anterior</button>
+        <button id="next" class="ghost">Próxima rodada →</button>
+        <button id="paste" class="ghost">Colar do clipboard</button>
+        <button id="pasteStart" class="ghost">Colar & Iniciar</button>
+        <button id="preview" class="ghost">Pré-visualizar lote</button>
+      </div>
+
+      <small class="muted">Critério “inglês”: contém letras A–Z e não contém acentos (ASCII).</small>
+      <textarea id="box" placeholder="As URLs entram aqui automaticamente; se não, cole (1 por linha)."></textarea>
+
+      <div class="bar"><i id="p"></i></div>
+      <div id="log" class="muted" style="margin-top:6px"></div>
     </div>
-
-    <div class="row" style="margin-bottom:8px">
-      <button id="start">Iniciar lote</button>
-      <button id="prev" class="ghost">← Rodada anterior</button>
-      <button id="next" class="ghost">Próxima rodada →</button>
-      <button id="paste" class="ghost">Colar do clipboard</button>
-      <button id="pasteStart" class="ghost">Colar & Iniciar</button>
-      <button id="preview" class="ghost">Pré-visualizar lote</button>
-    </div>
-
-    <small class="muted">Critério “inglês”: contém letras A–Z e não contém acentos (ASCII).</small>
-    <textarea id="box" placeholder="As URLs entram aqui automaticamente; se não, cole (1 por linha)."></textarea>
-
-    <div class="bar"><i id="p"></i></div>
-    <div id="log" class="muted" style="margin-top:6px"></div>
   </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script>
-const BASE   = location.origin;
-const API_ZIP= BASE + "/api/download-zip";
-const PROXY  = u => BASE + "/api/proxy-image?url=" + encodeURIComponent(u);
+  <!-- tesseract -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 
-let urlsAll = [];      // todas as URLs recebidas/coladas
-let batchIdx = 0;      // índice do lote atual (0-based)
-let batchSize = 30;    // tamanho de cada lote
-let received = false;  // postMessage chegou?
+  <script>
+    /* ===== Config / helpers ===== */
+    const BASE    = location.origin;
+    const API_ZIP = BASE + "/api/download-zip";
+    const PROXY   = u => BASE + "/api/proxy-image?url=" + encodeURIComponent(u);
 
-const $ = sel => document.querySelector(sel);
-const prog = $('#p');
-const log  = $('#log');
-const box  = $('#box');
-const badge= $('#badge');
+    let urlsAll   = [];  // todas as URLs recebidas/coladas
+    let batchIdx  = 0;   // índice do lote (0-based)
+    let batchSize = 30;  // tamanho do lote
+    let received  = false;
 
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function isAscii(t){ return /[A-Za-z]/.test(t) && !/[À-ÖØ-öø-ÿ]/.test(t); }
+    const $     = sel => document.querySelector(sel);
+    const prog  = $('#p');
+    const log   = $('#log');
+    const box   = $('#box');
+    const badge = $('#badge');
 
-function parseBoxToList() {
-  urlsAll = box.value.trim().split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  batchSize = Math.max(5, Math.min(100, Number($('#batch').value)||30));
-  if (urlsAll.length) updateBadge();
-}
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+    function isAscii(t){ return /[A-Za-z]/.test(t) && !/[À-ÖØ-öø-ÿ]/.test(t); }
 
-function currentBatch() {
-  if (!urlsAll.length) return [];
-  batchSize = Math.max(5, Math.min(100, Number($('#batch').value)||30));
-  const start = batchIdx * batchSize;
-  return urlsAll.slice(start, start + batchSize);
-}
-
-function updateBadge(){
-  const total = urlsAll.length;
-  const pages = Math.max(1, Math.ceil(total / batchSize));
-  batchIdx = Math.max(0, Math.min(batchIdx, pages-1));
-  badge.textContent = `Rodada ${pages ? (batchIdx+1) : 1}/${pages || 1} • total ${total}`;
-}
-
-async function pasteFromClipboard(){
-  try{
-    const txt = await navigator.clipboard.readText();
-    if (txt) {
-      box.value = txt.trim();
-      parseBoxToList();
+    function parseBoxToList(){
+      urlsAll = box.value.trim().split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      batchSize = Math.max(5, Math.min(100, Number($('#batch').value)||30));
+      updateBadge();
     }
-  }catch{
-    alert("Não consegui ler o clipboard. Clique no textarea e use Ctrl/Cmd+V.");
-  }
-}
-
-async function loadImage(u){
-  return new Promise((res,rej)=>{
-    const im = new Image();
-    im.crossOrigin = "anonymous";
-    im.onload = ()=>res(im);
-    im.onerror = rej;
-    im.src = PROXY(u);
-  });
-}
-function drawScaled(img, maxSide){
-  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.max(1, Math.round(img.naturalWidth * scale));
-  const h = Math.max(1, Math.round(img.naturalHeight * scale));
-  const cv = document.createElement("canvas");
-  cv.width = w; cv.height = h;
-  cv.getContext("2d").drawImage(img, 0, 0, w, h);
-  return cv;
-}
-<script>
-/* … código existente … */
-
-function normalizeGImage(u) {
-  try {
-    // Alvos comuns de miniaturas do Google
-    const hostRe = /(lh\d+\.googleusercontent\.com|ggpht\.com|tpc\.googlesyndication\.com|gstatic\.com)/i;
-    if (!hostRe.test(u)) return u;
-
-    // Remove sufixos de redimensionamento já existentes (=s###, =w###-h###, -rw, etc.)
-    let base = u.replace(/=s\d+(-[a-z-]+)*/i, '')
-                .replace(/=w\d+-h\d+(-[a-z-]+)*/i, '')
-                .replace(/-rw\b/gi, '')
-                .replace(/-no\b/gi, '')
-                .replace(/(&|\?)imgdl=\d+/i, '')
-                .replace(/(&|\?)quality=\d+/i, '');
-
-    // Garante um tamanho grande (s1600 costuma vir em alta; s0 é “original” em alguns hosts)
-    // Prefiro s1600 por ser bem estável:
-    if (base.includes('?')) base = base.split('?')[0];
-    if (!/=s\d+/.test(base)) base += '=s1600';
-
-    return base;
-  } catch { return u; }
-}
-
-// Util para debug: mostra thumbs do lote atual
-async function debugPreview(urls) {
-  const w = window.open('', '_blank');
-  if (!w) return alert('Pop-up bloqueado. Libere pop-ups para ver a prévia.');
-  w.document.write('<title>Prévia do lote</title><style>body{background:#0b1220;color:#eee;font-family:sans-serif}img{max-width:320px;margin:6px;border-radius:8px;border:1px solid #1f2937}</style><div id="g"></div>');
-  const g = w.document.getElementById('g');
-  for (const u of urls) {
-    const nu = normalizeGImage(u);
-    const img = await loadImage(normalizeGImage(u));
-    img.src = PROXY(nu);
-    img.title = nu;
-    g.appendChild(img);
-  }
-}
-</script>
-
-async function runOCRBatch(){
-  if (!urlsAll.length) parseBoxToList();
-  const urls = currentBatch();
-  const minConf = Number($('#conf').value)||60;
-
-  if (!urls.length) { alert("Cole/receba as URLs primeiro."); return; }
-
-  const approved = [];
-  let done = 0;
-  log.textContent = `Processando lote com ${urls.length} imagens...`;
-
-  for (const u of urls) {
-    done++;
-    prog.style.width = Math.round((done/urls.length)*100) + "%";
-    log.textContent = `OCR ${done}/${urls.length}`;
-
-    try{
-      const img = await loadImage(u);
-      const cv  = drawScaled(img, 900);
-      const r   = await Tesseract.recognize(cv, "eng");
-      const words = r.data?.words || [];
-      const conf = words.length
-        ? words.reduce((s,w)=>s+(w.confidence||0),0)/words.length
-        : (r.data?.confidence || 0);
-      const text = (r.data?.text || "").trim();
-
-      if (isAscii(text) && conf >= minConf) approved.push(u);
-
-      await sleep(35); // dá fôlego pro navegador
-    }catch(e){
-      // ignora falhas individuais
+    function currentBatch(){
+      if (!urlsAll.length) return [];
+      const start = batchIdx * batchSize;
+      return urlsAll.slice(start, start + batchSize);
     }
-  }
+    function updateBadge(){
+      const total = urlsAll.length;
+      const pages = Math.max(1, Math.ceil(total / batchSize));
+      batchIdx = Math.max(0, Math.min(batchIdx, pages - 1));
+      badge.textContent = `Rodada ${pages ? (batchIdx+1) : 1}/${pages || 1} • total ${total}`;
+    }
 
-  if (!approved.length) {
-    alert(`Nenhuma imagem aprovada (>= ${minConf}% de confiança) neste lote.`);
-    return;
-  }
+    async function pasteFromClipboard(){
+      try{
+        const txt = await navigator.clipboard.readText();
+        if (txt){
+          box.value = txt.trim();
+          parseBoxToList();
+        }
+      }catch{
+        alert("Não consegui ler o clipboard. Clique no textarea e use Ctrl/Cmd+V.");
+      }
+    }
 
-  if (!confirm(`Aprovadas ${approved.length} de ${urls.length}. Baixar ZIP?`)) return;
+    function loadImage(u){
+      return new Promise((res, rej)=>{
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.onload  = () => res(im);
+        im.onerror = rej;
+        im.src     = PROXY(u);
+      });
+    }
+    function drawScaled(img, maxSide){
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      return cv;
+    }
 
-  try{
-    const resp = await fetch(API_ZIP, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ urls: approved })
+    /* ===== Pré-visualização (thumbs do lote atual) ===== */
+    function debugPreview(urls){
+      const ovl  = document.createElement('div'); ovl.className = 'ovl';
+      const box  = document.createElement('div'); box.className = 'box';
+      const hd   = document.createElement('div'); hd.className  = 'hd';
+      const h3   = document.createElement('h3'); h3.textContent = `Pré-visualização (${urls.length})`;
+      const cls  = document.createElement('button'); cls.textContent = 'Fechar'; cls.className = 'xbtn';
+      const grid = document.createElement('div'); grid.className = 'grid';
+
+      cls.onclick = () => document.body.removeChild(ovl);
+      ovl.onclick = (e) => { if (e.target === ovl) document.body.removeChild(ovl); };
+      document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && document.body.contains(ovl)) document.body.removeChild(ovl); }, { once:true });
+
+      urls.forEach(u=>{
+        const cell = document.createElement('div'); cell.className = 'thumb';
+        const im   = document.createElement('img');
+        im.loading = 'lazy';
+        im.referrerPolicy = 'no-referrer';
+        im.src = PROXY(u);
+        im.onerror = () => { cell.textContent = 'erro'; cell.style.color='#9ca3af'; };
+        cell.appendChild(im);
+        grid.appendChild(cell);
+      });
+
+      hd.appendChild(h3); hd.appendChild(cls);
+      box.appendChild(hd); box.appendChild(grid);
+      ovl.appendChild(box);
+      document.body.appendChild(ovl);
+    }
+
+    /* ===== OCR (por lote) ===== */
+    async function runOCRBatch(){
+      if (!urlsAll.length) parseBoxToList();
+      const urls   = currentBatch();
+      const minConf= Number($('#conf').value) || 60;
+
+      if (!urls.length){ alert("Cole/receba as URLs primeiro."); return; }
+
+      const approved = [];
+      let done = 0;
+      log.textContent = `Processando lote com ${urls.length} imagens...`;
+
+      for (const u of urls){
+        done++;
+        prog.style.width = Math.round((done / urls.length) * 100) + "%";
+        log.textContent  = `OCR ${done}/${urls.length}`;
+
+        try{
+          const img = await loadImage(u);
+          const cv  = drawScaled(img, 900);
+          const r   = await Tesseract.recognize(cv, "eng");
+          const words = r.data?.words || [];
+          const conf  = words.length
+            ? words.reduce((s,w)=>s+(w.confidence||0),0)/words.length
+            : (r.data?.confidence || 0);
+          const text = (r.data?.text || "").trim();
+
+          if (isAscii(text) && conf >= minConf) approved.push(u);
+          await sleep(35);
+        }catch(e){
+          /* ignora falhas individuais */
+        }
+      }
+
+      if (!approved.length){
+        alert(`Nenhuma imagem aprovada (>= ${minConf}% de confiança) neste lote.`);
+        return;
+      }
+      if (!confirm(`Aprovadas ${approved.length} de ${urls.length}. Baixar ZIP?`)) return;
+
+      try{
+        const resp = await fetch(API_ZIP, {
+          method : "POST",
+          headers: {"Content-Type": "application/json"},
+          body   : JSON.stringify({ urls: approved })
+        });
+        if (!resp.ok) throw new Error("Falha ao gerar ZIP no servidor.");
+        const blob = await resp.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "ads-english.zip";
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+      }catch(e){
+        console.error(e);
+        alert("Erro ao gerar ZIP.");
+      }
+    }
+
+    /* ===== Listeners de UI ===== */
+    $('#start').onclick      = runOCRBatch;
+    $('#paste').onclick      = pasteFromClipboard;
+    $('#pasteStart').onclick = async ()=>{ await pasteFromClipboard(); runOCRBatch(); };
+    $('#prev').onclick       = ()=>{ if (batchIdx>0){ batchIdx--; updateBadge(); } };
+    $('#next').onclick       = ()=>{ if ((batchIdx+1)*batchSize < urlsAll.length){ batchIdx++; updateBadge(); } };
+    $('#batch').onchange     = ()=>{ parseBoxToList(); };
+    box.addEventListener('input', parseBoxToList);
+
+    // Pré-visualização SEM depender de postMessage
+    $('#preview').onclick = ()=>{
+      const urls = currentBatch();
+      if (!urls.length) return alert('Sem URLs no lote.');
+      debugPreview(urls);
+    };
+
+    /* ===== Recebe URLs do coletor via postMessage ===== */
+    window.addEventListener("message", (e)=>{
+      if (e.origin !== BASE) return;
+      const d = e.data || {};
+      if (d.type === "ads-urls" && Array.isArray(d.urls)){
+        received = true;
+        urlsAll  = d.urls.filter(Boolean);
+        box.value = urlsAll.join("\n");
+        updateBadge();
+      }
     });
-    if (!resp.ok) throw new Error("Falha ao gerar ZIP no servidor.");
-    const blob = await resp.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "ads-english.zip";
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-  }catch(e){
-    console.error(e);
-    alert("Erro ao gerar ZIP.");
-  }
-}
-<script>
-// ... (deixe aqui em cima todo o resto do seu JS já existente: BASE, PROXY, funções, runOCRBatch etc.)
 
-/* ===== Listeners de UI ===== */
-$('#start').onclick       = runOCRBatch;
-$('#paste').onclick       = pasteFromClipboard;
-$('#pasteStart').onclick  = async ()=>{ await pasteFromClipboard(); runOCRBatch(); };
-$('#prev').onclick        = ()=>{ if (batchIdx>0){ batchIdx--; updateBadge(); } };
-$('#next').onclick        = ()=>{ if ((batchIdx+1)*batchSize < urlsAll.length){ batchIdx++; updateBadge(); } };
-$('#batch').onchange      = ()=>{ parseBoxToList(); };
-box.addEventListener('input', parseBoxToList);
-
-// Pré-visualização SEM depender do postMessage
-$('#preview').onclick = ()=> {
-  const urls = currentBatch();
-  if (!urls.length) return alert('Sem URLs no lote.');
-  debugPreview(urls); // abre as thumbs normalizadas
-};
-
-/* ===== Recebe URLs do coletor via postMessage ===== */
-window.addEventListener("message", (e)=>{
-  if (e.origin !== BASE) return;
-  const d = e.data || {};
-  if (d.type === "ads-urls" && Array.isArray(d.urls)) {
-    received = true;
-    urlsAll  = d.urls.filter(Boolean);
-    box.value = urlsAll.join("\n");
-    updateBadge();
-  }
-});
-
-// se nada chegar, segue vida com colar manual
-setTimeout(()=>{
-  if(!received){
-    console.log("Nenhuma lista via postMessage; cole manualmente ou use 'Colar do clipboard'.");
-  }
-}, 2000);
-</script>
+    // se nada chegar, segue vida com colar manual
+    setTimeout(()=>{ if(!received){ console.log("Nenhuma lista via postMessage; cole manualmente ou use 'Colar do clipboard'."); } }, 2000);
+  </script>
 </body>
 </html>
