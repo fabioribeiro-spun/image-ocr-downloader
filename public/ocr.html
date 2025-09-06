@@ -223,15 +223,24 @@ async function runOCRBatch(){
     alert("Erro ao gerar ZIP.");
   }
 }
+<script>
+// ... (deixe aqui em cima todo o resto do seu JS já existente: BASE, PROXY, funções, runOCRBatch etc.)
 
 /* ===== Listeners de UI ===== */
-$('#start').onclick = runOCRBatch;
-$('#paste').onclick = pasteFromClipboard;
-$('#pasteStart').onclick = async ()=>{ await pasteFromClipboard(); runOCRBatch(); };
-$('#prev').onclick = ()=>{ if (batchIdx>0){ batchIdx--; updateBadge(); } };
-$('#next').onclick = ()=>{ if ((batchIdx+1)*batchSize < urlsAll.length){ batchIdx++; updateBadge(); } };
-$('#batch').onchange = ()=>{ parseBoxToList(); };
+$('#start').onclick       = runOCRBatch;
+$('#paste').onclick       = pasteFromClipboard;
+$('#pasteStart').onclick  = async ()=>{ await pasteFromClipboard(); runOCRBatch(); };
+$('#prev').onclick        = ()=>{ if (batchIdx>0){ batchIdx--; updateBadge(); } };
+$('#next').onclick        = ()=>{ if ((batchIdx+1)*batchSize < urlsAll.length){ batchIdx++; updateBadge(); } };
+$('#batch').onchange      = ()=>{ parseBoxToList(); };
 box.addEventListener('input', parseBoxToList);
+
+// Pré-visualização SEM depender do postMessage
+$('#preview').onclick = ()=> {
+  const urls = currentBatch();
+  if (!urls.length) return alert('Sem URLs no lote.');
+  debugPreview(urls); // abre as thumbs normalizadas
+};
 
 /* ===== Recebe URLs do coletor via postMessage ===== */
 window.addEventListener("message", (e)=>{
@@ -239,14 +248,18 @@ window.addEventListener("message", (e)=>{
   const d = e.data || {};
   if (d.type === "ads-urls" && Array.isArray(d.urls)) {
     received = true;
-    urlsAll = d.urls.filter(Boolean);
+    urlsAll  = d.urls.filter(Boolean);
     box.value = urlsAll.join("\n");
     updateBadge();
-$('#preview').onclick = ()=> { const urls = currentBatch(); if (!urls.length) return alert('Sem URLs no lote.'); debugPreview(urls); };
   }
 });
+
 // se nada chegar, segue vida com colar manual
-setTimeout(()=>{ if(!received){ console.log("Nenhuma lista via postMessage; cole manualmente ou use 'Colar do clipboard'."); } }, 2000);
+setTimeout(()=>{
+  if(!received){
+    console.log("Nenhuma lista via postMessage; cole manualmente ou use 'Colar do clipboard'.");
+  }
+}, 2000);
 </script>
 </body>
 </html>
