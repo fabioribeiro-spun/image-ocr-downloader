@@ -18,7 +18,8 @@
     textarea{width:100%;height:220px;margin-top:10px;border-radius:8px;background:#0b1220;border:1px solid #1f2937;color:#e5e7eb}
     small,.muted{color:#9ca3af}
     .pill{display:inline-block;padding:3px 8px;border:1px solid #1f2937;border-radius:999px;background:#0b1220}
-    /* preview modal */
+
+    /* modal de pré-visualização */
     .ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:saturate(140%) blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999}
     .box{max-width:1000px;width:90vw;max-height:85vh;overflow:auto;background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:14px}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
@@ -62,7 +63,7 @@
     </div>
   </div>
 
-  <!-- tesseract -->
+  <!-- Tesseract -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 
   <script>
@@ -114,29 +115,54 @@
       }
     }
 
+    /* ===== Carregar imagem + pré-processar para OCR ===== */
     function loadImage(u){
       return new Promise((res, rej)=>{
         const im = new Image();
         im.crossOrigin = "anonymous";
+        im.referrerPolicy = "no-referrer";
         im.onload  = () => res(im);
         im.onerror = rej;
         im.src     = PROXY(u);
       });
     }
-    function drawScaled(img, maxSide){
-      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.max(1, Math.round(img.naturalWidth * scale));
-      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    // Prepara a imagem:
+    // - upscaling até ~1000px no lado maior (limite 3x)
+    // - grayscale + contraste leve
+    function prepareCanvas(img, targetMax = 1000){
+      const longest = Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height);
+      const scale   = Math.min(3, targetMax / Math.max(1,longest)); // até 3x
+      const w = Math.max(1, Math.round((img.naturalWidth || img.width)  * scale));
+      const h = Math.max(1, Math.round((img.naturalHeight|| img.height) * scale));
+
       const cv = document.createElement("canvas");
       cv.width = w; cv.height = h;
-      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // grayscale + contraste
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      const contrast = 1.25; // 1.2~1.4 costuma ajudar em thumbs
+
+      for (let i = 0; i < d.length; i += 4){
+        let g = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114; // grayscale
+        g = (g - 128) * contrast + 128;                   // contraste
+        g = g < 0 ? 0 : g > 255 ? 255 : g;
+        d[i] = d[i+1] = d[i+2] = g;
+      }
+      ctx.putImageData(imgData, 0, 0);
+
       return cv;
     }
 
     /* ===== Pré-visualização (thumbs do lote atual) ===== */
     function debugPreview(urls){
       const ovl  = document.createElement('div'); ovl.className = 'ovl';
-      const box  = document.createElement('div'); box.className = 'box';
+      const b    = document.createElement('div'); b.className   = 'box';
       const hd   = document.createElement('div'); hd.className  = 'hd';
       const h3   = document.createElement('h3'); h3.textContent = `Pré-visualização (${urls.length})`;
       const cls  = document.createElement('button'); cls.textContent = 'Fechar'; cls.className = 'xbtn';
@@ -158,16 +184,16 @@
       });
 
       hd.appendChild(h3); hd.appendChild(cls);
-      box.appendChild(hd); box.appendChild(grid);
-      ovl.appendChild(box);
+      b.appendChild(hd); b.appendChild(grid);
+      ovl.appendChild(b);
       document.body.appendChild(ovl);
     }
 
-    /* ===== OCR (por lote) ===== */
+    /* ===== OCR por lote ===== */
     async function runOCRBatch(){
       if (!urlsAll.length) parseBoxToList();
-      const urls   = currentBatch();
-      const minConf= Number($('#conf').value) || 60;
+      const urls    = currentBatch();
+      const minConf = Number($('#conf').value) || 60;
 
       if (!urls.length){ alert("Cole/receba as URLs primeiro."); return; }
 
@@ -182,7 +208,7 @@
 
         try{
           const img = await loadImage(u);
-          const cv  = drawScaled(img, 900);
+          const cv  = prepareCanvas(img, 1000);
           const r   = await Tesseract.recognize(cv, "eng");
           const words = r.data?.words || [];
           const conf  = words.length
@@ -191,9 +217,9 @@
           const text = (r.data?.text || "").trim();
 
           if (isAscii(text) && conf >= minConf) approved.push(u);
-          await sleep(35);
+          await sleep(35);  // não travar a guia
         }catch(e){
-          /* ignora falhas individuais */
+          // ignora falhas individuais
         }
       }
 
@@ -206,7 +232,7 @@
       try{
         const resp = await fetch(API_ZIP, {
           method : "POST",
-          headers: {"Content-Type": "application/json"},
+          headers: {"Content-Type":"application/json"},
           body   : JSON.stringify({ urls: approved })
         });
         if (!resp.ok) throw new Error("Falha ao gerar ZIP no servidor.");
@@ -222,7 +248,7 @@
       }
     }
 
-    /* ===== Listeners de UI ===== */
+    /* ===== Listeners ===== */
     $('#start').onclick      = runOCRBatch;
     $('#paste').onclick      = pasteFromClipboard;
     $('#pasteStart').onclick = async ()=>{ await pasteFromClipboard(); runOCRBatch(); };
@@ -231,7 +257,6 @@
     $('#batch').onchange     = ()=>{ parseBoxToList(); };
     box.addEventListener('input', parseBoxToList);
 
-    // Pré-visualização SEM depender de postMessage
     $('#preview').onclick = ()=>{
       const urls = currentBatch();
       if (!urls.length) return alert('Sem URLs no lote.');
@@ -250,7 +275,7 @@
       }
     });
 
-    // se nada chegar, segue vida com colar manual
+    // caso não chegue nada automaticamente, usuário cola manualmente
     setTimeout(()=>{ if(!received){ console.log("Nenhuma lista via postMessage; cole manualmente ou use 'Colar do clipboard'."); } }, 2000);
   </script>
 </body>
