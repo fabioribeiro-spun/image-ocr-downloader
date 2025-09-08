@@ -1,67 +1,105 @@
+// server.js (com proxy robusto)
 const express = require("express");
-const axios = require("axios");
 const cors = require("cors");
-const morgan = require("morgan");
 const path = require("path");
-const archiver = require("archiver");
-
+const { pipeline } = require("stream");
+const { promisify } = require("util");
+const fetch = (...args) => import("node-fetch").then(({default: f}) => f(...args));
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+const PORT = process.env.PORT || 10000;
 
 app.use(cors());
-app.use(morgan("tiny"));
-app.use(express.json({ limit: "2mb" }));
-app.use(express.static("public"));
+app.use(express.json({ limit: "1mb" }));
 
-// Proxy de imagem (CORS-free para o front usar no OCR)
+// serve os arquivos do /public (index.html, ocr.html, etc.)
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders(res) {
+    // habilita uso em canvas
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  }
+}));
+
+/**
+ * Proxy de imagem com cabeçalhos "amigáveis"
+ * Ex.: GET /api/proxy-image?url=<URL-DA-IMAGEM>
+ */
 app.get("/api/proxy-image", async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).send("url obrigatória");
   try {
-    const up = await axios.get(url, { responseType: "stream", timeout: 20000, validateStatus: s => s >= 200 && s < 500 });
-    const ct = up.headers["content-type"] || "application/octet-stream";
-    res.setHeader("Content-Type", ct);
-    up.data.pipe(res);
+    const target = req.query.url;
+    if (!target || !/^https?:\/\//i.test(target)) {
+      return res.status(400).send("bad url");
+    }
+
+    // Alguns servidores do Google exigem UA e aceitam melhor com referer
+    const r = await fetch(target, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        // referer ajuda em alguns hosts do Google
+        "Referer": "https://adstransparency.google.com/",
+      },
+    });
+
+    if (!r.ok) {
+      return res.status(r.status).send("fetch error");
+    }
+
+    // repassa tipo e cache curto
+    const ctype = r.headers.get("content-type") || "application/octet-stream";
+    res.setHeader("Content-Type", ctype);
+    res.setHeader("Cache-Control", "public, max-age=300");
+
+    const streamPipeline = promisify(pipeline);
+    await streamPipeline(r.body, res);
   } catch (e) {
-    res.status(502).send("Falha ao buscar imagem.");
+    res.status(502).send("proxy fail");
   }
 });
 
-// Recebe lista e devolve ZIP
+/**
+ * Recebe { urls: [...] } e devolve um ZIP com as imagens aprovadas
+ * (mantém sua implementação atual; abaixo um exemplo mínimo)
+ */
+const JSZip = require("jszip");
 app.post("/api/download-zip", async (req, res) => {
-  const { urls } = req.body || {};
-  if (!Array.isArray(urls) || urls.length === 0) {
-    return res.status(400).json({ error: "Envie { urls: [...] }" });
-  }
+  try {
+    const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
+    if (!urls.length) return res.status(400).send("no urls");
 
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", 'attachment; filename="images.zip"');
+    const zip = new JSZip();
 
-  const zip = archiver("zip", { zlib: { level: 9 } });
-  zip.on("error", err => { console.error(err); try { res.status(500).end(); } catch {} });
-  zip.pipe(res);
-
-  let i = 1;
-  for (const u of urls) {
-    try {
-      const up = await axios.get(u, { responseType: "stream", timeout: 20000, validateStatus: s => s >= 200 && s < 500 });
-      const ct = up.headers["content-type"] || "";
-      let ext = ".jpg";
-      if (ct.includes("png")) ext = ".png";
-      else if (ct.includes("webp")) ext = ".webp";
-      else if (ct.includes("gif")) ext = ".gif";
-      else {
-        const m = (new URL(u).pathname).match(/\.(jpg|jpeg|png|webp|gif|bmp)/i);
-        if (m) ext = "." + m[1].toLowerCase();
-      }
-      zip.append(up.data, { name: `ad-${String(i).padStart(3,"0")}${ext}` });
-      i++;
-    } catch (e) {
-      console.warn("Falha ao baixar:", u);
+    // baixa e coloca cada imagem no zip usando o mesmo proxy fetch
+    for (let i = 0; i < urls.length; i++) {
+      const u = urls[i];
+      const r = await fetch(u, {
+        redirect: "follow",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Referer": "https://adstransparency.google.com/",
+        },
+      });
+      if (!r.ok) continue;
+      const buf = await r.arrayBuffer();
+      const ext = (r.headers.get("content-type") || "").split("/")[1] || "bin";
+      zip.file(`img_${String(i+1).padStart(3,"0")}.${ext.split(";")[0]}`, Buffer.from(buf));
     }
-  }
 
-  zip.finalize();
+    const blob = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="ads-english.zip"');
+    res.send(blob);
+  } catch (e) {
+    res.status(500).send("zip error");
+  }
 });
 
 app.listen(PORT, () => {
